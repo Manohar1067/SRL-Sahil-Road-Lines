@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSettings, hashPin } from "@/lib/store";
+import { useSettings, hashPin, STORAGE_KEYS } from "@/lib/store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,16 @@ import { toast } from "sonner";
 
 // Default first-run PIN so the demo is always accessible; the user is prompted to change it in Settings.
 const DEFAULT_PIN = "1234";
+
+/** Read raw settings from localStorage to avoid stale React state */
+function readRawSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.settings);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AdminLock({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useSettings();
@@ -18,12 +28,39 @@ export function AdminLock({ children }: { children: ReactNode }) {
   const timerRef = useRef<number | null>(null);
 
   // Ensure a PIN exists on first run (hashed default)
+  // IMPORTANT: read fresh from localStorage — do NOT spread stale React state
+  // (stale state has logo:"" as default which would overwrite the saved logo)
   useEffect(() => {
     if (!settings.adminPinHash) {
-      hashPin(DEFAULT_PIN).then((h) => setSettings({ ...settings, adminPinHash: h }));
+      hashPin(DEFAULT_PIN).then((h) => {
+        const fresh = readRawSettings();
+        if (fresh && !fresh.adminPinHash) {
+          setSettings({ ...fresh, adminPinHash: h });
+        } else if (!fresh) {
+          setSettings({ ...settings, adminPinHash: h });
+        }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep favicon in sync even while the app is locked (AppShell is unmounted)
+  useEffect(() => {
+    const logo = settings.company?.logo;
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    if (logo) {
+      link.href = logo;
+      link.type = "image/png";
+    } else {
+      link.href = "/favicon.ico";
+      link.type = "image/x-icon";
+    }
+  }, [settings.company?.logo]);
 
   const resetTimer = () => {
     if (locked) return;
@@ -75,8 +112,18 @@ export function AdminLock({ children }: { children: ReactNode }) {
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
         <Card className="w-full max-w-sm border-0 shadow-2xl">
           <CardContent className="p-8 text-center">
-            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
-              <Lock className="h-7 w-7" />
+            <div className="mx-auto mb-4">
+              {settings.company?.logo ? (
+                <img
+                  src={settings.company.logo}
+                  alt="logo"
+                  className="h-16 w-16 rounded-2xl object-contain bg-white p-1 mx-auto shadow"
+                />
+              ) : (
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary mx-auto">
+                  <Lock className="h-7 w-7" />
+                </div>
+              )}
             </div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">
               {settings.company?.name || "SAHIL ROAD LINES"}
