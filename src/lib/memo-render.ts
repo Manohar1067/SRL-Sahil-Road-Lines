@@ -8,260 +8,460 @@ const INR = (n: number) =>
 const W = 1240;
 const H = 1754;
 
-const PRIMARY = "#1f4fc4";
-const TEXT = "#0b1220";
-const MUTED = "#5b6472";
-const BORDER = "#b7c0d1";
-const SOFT = "#eef2fb";
+// Brand colours matching the physical memo
+const RED    = "#c0272d";
+const NAVY   = "#1a2e5e";
+const TEXT   = "#0b1220";
+const MUTED  = "#5b6472";
+const BORDER = "#9ca3af";  // gray-400
 
-function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number) {
-  let display = text;
-  while (ctx.measureText(display).width > maxW && display.length > 3) display = display.slice(0, -2);
-  if (display !== text) display = display.slice(0, -1) + "…";
-  ctx.fillText(display, x, y);
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function drawTruncated(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number) {
+  let s = String(text || "");
+  while (ctx.measureText(s).width > maxW && s.length > 1) s = s.slice(0, -1);
+  if (s !== String(text || "")) s = s.slice(0, -1) + "…";
+  ctx.fillText(s, x, y);
 }
 
-function drawSection(
+/** Draw a single diamond (rotated square) at centre cx,cy, half-width hw, half-height hh */
+function drawDiamond(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number,
-  title: string
+  cx: number, cy: number,
+  hw: number, hh: number,
+  strokeW: number, color: string
 ) {
-  ctx.strokeStyle = BORDER;
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(x, y, w, h);
-  ctx.fillStyle = SOFT;
-  ctx.fillRect(x, y, w, 26);
-  ctx.fillStyle = PRIMARY;
-  ctx.font = "700 12px Inter, Arial, sans-serif";
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "left";
-  ctx.fillText(title.toUpperCase(), x + 10, y + 13);
-  ctx.textBaseline = "top";
+  ctx.beginPath();
+  ctx.moveTo(cx,      cy - hh);
+  ctx.lineTo(cx + hw, cy);
+  ctx.lineTo(cx,      cy + hh);
+  ctx.lineTo(cx - hw, cy);
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = strokeW;
+  ctx.stroke();
 }
 
-function drawField(
+/** Draw the SRL 3-diamond logo at top-left corner position (lx, ly) */
+function drawSrlLogo(ctx: CanvasRenderingContext2D, lx: number, ly: number, scale: number) {
+  // Three diamond centres in logo coordinate space, then scaled
+  // S (top-centre): local (60, 30), R (bottom-left): (32, 68), L (bottom-right): (88, 68)
+  // viewBox is 120 x 110, scale maps it to desired size
+  const diamonds = [
+    { cx: 60, cy: 30, letter: "S" },
+    { cx: 32, cy: 68, letter: "R" },
+    { cx: 88, cy: 68, letter: "L" },
+  ];
+  const HW = 26 * scale; // half-width
+  const HH = 32 * scale; // half-height
+  const INSET = 5 * scale;
+  const NAVY_C = NAVY;
+
+  // Draw white fill first for each, then outer border, then inner border, then letter
+  ctx.save();
+  ctx.translate(lx, ly);
+
+  diamonds.forEach(({ cx, cy, letter }) => {
+    const scx = cx * scale, scy = cy * scale;
+
+    // White fill
+    ctx.beginPath();
+    ctx.moveTo(scx,       scy - HH);
+    ctx.lineTo(scx + HW,  scy);
+    ctx.lineTo(scx,       scy + HH);
+    ctx.lineTo(scx - HW,  scy);
+    ctx.closePath();
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // Outer border
+    drawDiamond(ctx, scx, scy, HW, HH, 3 * scale, NAVY_C);
+
+    // Inner inset border
+    drawDiamond(ctx, scx, scy, HW - INSET, HH - INSET, 1.5 * scale, NAVY_C);
+
+    // Letter
+    ctx.fillStyle = NAVY_C;
+    ctx.font = `700 ${Math.round(18 * scale)}px Inter, Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(letter, scx, scy);
+  });
+
+  ctx.restore();
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+}
+
+// ── Horizontal divider line ───────────────────────────────────────────────────
+function hline(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, color = BORDER, lw = 1.2) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+}
+
+function vline(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, color = BORDER, lw = 1.2) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y + h);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+}
+
+/** Draw a labelled field — small label above, value below */
+function field(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number,
+  x: number, y: number, maxW: number,
   label: string, value: string
 ) {
   ctx.fillStyle = MUTED;
-  ctx.font = "600 10px Inter, Arial, sans-serif";
-  ctx.fillText(label.toUpperCase(), x, y);
+  ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText(label, x, y);
   ctx.fillStyle = TEXT;
-  ctx.font = "600 13px Inter, Arial, sans-serif";
-  drawText(ctx, value || "—", x, y + 14, w - 6);
+  ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, value || "—", x, y + 22, maxW - 8);
 }
+
+// ── Main render ───────────────────────────────────────────────────────────────
 
 export function renderMemoToCanvas(d: Dispatch, company: CompanyInfo): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
-  canvas.width = W;
+  canvas.width  = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
   ctx.textBaseline = "top";
 
-  // Background
+  // White background
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  // Outer border
-  ctx.strokeStyle = "#334155";
-  ctx.lineWidth = 2;
+  // Outer thin black border
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth   = 2.5;
   ctx.strokeRect(30, 30, W - 60, H - 60);
 
-  // ===== Header =====
-  ctx.fillStyle = PRIMARY;
-  ctx.fillRect(30, 30, W - 60, 130);
+  const L = 50;          // left margin
+  const FW = W - 100;   // full content width
+  let y = 35;
 
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
-  ctx.font = "700 34px Inter, Arial, sans-serif";
-  ctx.fillText(company.name || "SAHIL ROAD LINES", W / 2, 48);
-  ctx.font = "600 14px Inter, Arial, sans-serif";
-  ctx.fillText("TRANSPORT CONTRACTORS & COMMISSION AGENTS", W / 2, 86);
-  ctx.font = "400 12px Inter, Arial, sans-serif";
-  ctx.fillText(company.address || "", W / 2, 108);
-  ctx.fillText(
-    `Phone: ${company.phone || "-"}   |   GST: ${company.gst || "-"}${company.email ? `   |   Email: ${company.email}` : ""}`,
-    W / 2, 126
-  );
+  // ── TOP INFO BAR ─────────────────────────────────────────────────────────
+  ctx.fillStyle = MUTED;
+  ctx.font = "400 16px Inter, Arial, sans-serif";
   ctx.textAlign = "left";
-
-  // Title strip
-  let y = 170;
-  ctx.fillStyle = SOFT;
-  ctx.fillRect(30, y, W - 60, 34);
-  ctx.strokeStyle = BORDER;
-  ctx.strokeRect(30, y, W - 60, 34);
-  ctx.fillStyle = PRIMARY;
-  ctx.font = "700 18px Inter, Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("GOODS DISPATCH MEMO", W / 2, y + 9);
-  ctx.font = "600 12px Inter, Arial, sans-serif";
-  ctx.fillStyle = TEXT;
+  ctx.fillText("* Subject to Visakhapatnam Jurisdiction", L, y + 6);
   ctx.textAlign = "right";
-  ctx.fillText(`Memo No: ${d.receiptNumber}`, W - 50, y + 12);
+  ctx.fillText(`Cell: ${company.phone || "93931 02969"}`, L + FW, y + 6);
   ctx.textAlign = "left";
-  y += 44;
+  y += 32;
 
-  const LEFT = 50;
-  const FULL_W = W - 100;
-  const col = (n: 2 | 3 | 4) => (FULL_W - 20) / n;
+  hline(ctx, 30, y, W - 60, BORDER, 1);
 
-  // ===== Dispatch Information =====
-  {
-    const secH = 90;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Dispatch Information");
-    const rowY = y + 40;
-    const cw = col(4);
-    drawField(ctx, LEFT + 10, rowY, cw, "Dispatch Memo #", d.receiptNumber);
-    drawField(ctx, LEFT + 10 + cw, rowY, cw, "Dispatch Date", d.date);
-    drawField(ctx, LEFT + 10 + cw * 2, rowY, cw, "Documentation Date", d.documentationDate || "—");
-    drawField(ctx, LEFT + 10 + cw * 3, rowY, cw, "Invoice Date", d.invoiceDate || "—");
-    y += secH + 10;
-  }
+  // ── HEADER — Logo left, company info right ────────────────────────────────
+  const LOGO_AREA_W = 200;
+  const HEADER_H    = 180;
 
-  // ===== Transport =====
-  {
-    const secH = 90;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Transport");
-    const rowY = y + 40;
-    const cw = col(4);
-    drawField(ctx, LEFT + 10, rowY, cw, "Truck Number", d.truckNumber);
-    drawField(ctx, LEFT + 10 + cw, rowY, cw, "Driver", d.driverName);
-    drawField(ctx, LEFT + 10 + cw * 2, rowY, cw, "Lorry Owner", d.lorryOwnerName);
-    drawField(ctx, LEFT + 10 + cw * 3, rowY, cw, "Route", `${d.from || "—"} → ${d.to || "—"}`);
-    y += secH + 10;
-  }
+  // Logo scale: logo viewBox 120px → LOGO_AREA_W ≈ 166px => scale ~1.4
+  const logoScale = 1.6;
+  const logoLX = L;
+  const logoLY = y + 10;
+  drawSrlLogo(ctx, logoLX, logoLY, logoScale);
 
-  // ===== Customer Information =====
-  {
-    const secH = 90;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Customer Information");
-    const rowY = y + 40;
-    const cw = col(3);
-    drawField(ctx, LEFT + 10, rowY, cw, "Consignor", d.consignor);
-    drawField(ctx, LEFT + 10 + cw, rowY, cw, "Consignee", d.consignee);
-    drawField(ctx, LEFT + 10 + cw * 2, rowY, cw, "Material", d.article);
-    y += secH + 10;
-  }
+  // Vertical divider between logo and company text
+  vline(ctx, L + LOGO_AREA_W, y, HEADER_H, NAVY, 2.5);
 
-  // ===== Freight =====
-  {
-    const secH = 90;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Freight");
-    const rowY = y + 40;
-    const cw = col(3);
-    drawField(ctx, LEFT + 10, rowY, cw, "Weight (Tons)", String(d.weight));
-    drawField(ctx, LEFT + 10 + cw, rowY, cw, "Rate Per Ton", INR(d.ratePerTon));
-    drawField(ctx, LEFT + 10 + cw * 2, rowY, cw, "Total Freight", INR(d.netFreight));
-    y += secH + 10;
-  }
+  // Company text — right of logo
+  const CX = L + LOGO_AREA_W + 24;
+  ctx.fillStyle = RED;
+  ctx.font = "800 46px Inter, Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("SAHIL ROAD LINES", CX, y + 14);
 
-  // ===== Payment =====
-  {
-    const secH = 130;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Payment");
-    const cw = col(4);
-    const r1 = y + 40;
-    drawField(ctx, LEFT + 10, r1, cw, "Advance", INR(d.advance));
-    drawField(ctx, LEFT + 10 + cw, r1, cw, "Balance", INR(d.balance));
-    drawField(ctx, LEFT + 10 + cw * 2, r1, cw, "Commission", INR(d.commission));
-    drawField(ctx, LEFT + 10 + cw * 3, r1, cw, "Loading Charges", INR(d.loadingCharges));
-    const r2 = r1 + 46;
-    const cw2 = col(2);
-    drawField(ctx, LEFT + 10, r2, cw2, "Paid At", d.paidAt || "—");
-    drawField(ctx, LEFT + 10 + cw2, r2, cw2, "Total Expenses", INR(d.totalExpenses));
-    y += secH + 10;
-  }
+  // Blue subtitle bar
+  const subBarY = y + 66;
+  ctx.fillStyle = NAVY;
+  ctx.fillRect(CX, subBarY, FW - LOGO_AREA_W - 24, 34);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 17px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("TRANSPORT CONTRACTORS & COMMISSION AGENTS", CX + (FW - LOGO_AREA_W - 24) / 2, subBarY + 9);
+  ctx.textAlign = "left";
 
-  // ===== Delivery =====
-  {
-    const secH = 80;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Delivery");
-    const rowY = y + 40;
-    const cw = col(2);
-    drawField(ctx, LEFT + 10, rowY, cw, "Status", d.status);
-    drawField(ctx, LEFT + 10 + cw, rowY, cw, "Delivery Date", d.deliveryDate || "Pending");
-    y += secH + 10;
-  }
+  ctx.fillStyle = TEXT;
+  ctx.font = "400 16px Inter, Arial, sans-serif";
+  ctx.fillText(
+    company.address || "Plot No.5, N.H.-5 Road, Opp. Radio Station, Kurmannapalem, Visakhapatnam - 530 046.",
+    CX, subBarY + 44
+  );
+  ctx.font = "400 15px Inter, Arial, sans-serif";
+  ctx.fillStyle = MUTED;
+  const gstLine = company.gst ? `GST: ${company.gst}` : "";
+  ctx.fillText(gstLine, CX, subBarY + 68);
 
-  // ===== Remarks =====
-  {
-    const secH = 90;
-    drawSection(ctx, LEFT, y, FULL_W, secH, "Remarks");
-    ctx.fillStyle = TEXT;
-    ctx.font = "500 12px Inter, Arial, sans-serif";
-    const remarks = d.remarks || "—";
-    const words = remarks.split(/\s+/);
-    let ln = "";
-    let ry = y + 40;
-    const maxW = FULL_W - 20;
-    words.forEach((w) => {
-      const test = ln ? ln + " " + w : w;
-      if (ctx.measureText(test).width > maxW) {
-        ctx.fillText(ln, LEFT + 10, ry);
-        ry += 16;
-        ln = w;
-      } else ln = test;
-    });
-    if (ln) ctx.fillText(ln, LEFT + 10, ry);
-    y += secH + 10;
-  }
+  y += HEADER_H;
 
-  // ===== Signatures =====
-  const sigY = H - 150;
-  const sigW = FULL_W / 3;
-  ctx.strokeStyle = "#475569";
-  ["Prepared By", "Driver Signature", "Authorized Signature"].forEach((lbl, i) => {
-    const x = LEFT + i * sigW;
-    ctx.beginPath();
-    ctx.moveTo(x + 20, sigY + 50);
-    ctx.lineTo(x + sigW - 30, sigY + 50);
-    ctx.stroke();
-    ctx.fillStyle = MUTED;
-    ctx.font = "600 11px Inter, Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(lbl.toUpperCase(), x + sigW / 2, sigY + 58);
-    ctx.textAlign = "left";
+  // Bottom border of header (navy thick)
+  hline(ctx, 30, y, W - 60, NAVY, 3);
+  y += 4;
+
+  // ── MEMO NO. + DATE ROW ───────────────────────────────────────────────────
+  const rowH = 52;
+  hline(ctx, 30, y + rowH, W - 60);
+
+  // "No."
+  ctx.fillStyle = TEXT;
+  ctx.font = "700 20px Inter, Arial, sans-serif";
+  ctx.fillText("No.", L, y + 14);
+
+  // Receipt number — red bold
+  ctx.fillStyle = RED;
+  ctx.font = "700 26px Inter, Courier New, monospace";
+  ctx.fillText(d.receiptNumber, L + 52, y + 10);
+
+  // Centre title
+  ctx.fillStyle = RED;
+  ctx.font = "800 26px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("GOODS DESPATCH MEMO", W / 2, y + 13);
+  ctx.textAlign = "left";
+
+  // Date right
+  ctx.fillStyle = TEXT;
+  ctx.font = "600 20px Inter, Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`Date: ${d.date}`, L + FW, y + 14);
+  ctx.textAlign = "left";
+
+  y += rowH + 4;
+
+  // ── FROM / TO / GC / ARTICLE ROW ─────────────────────────────────────────
+  hline(ctx, 30, y + rowH, W - 60);
+  const col4 = FW / 4;
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("From", L, y + 6);
+  ctx.fillStyle = TEXT;
+  ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, `${d.from || "—"}`, L + 60, y + 8, col4 * 1.5 - 20);
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("to", L + col4 * 1.5 + 10, y + 6);
+  ctx.fillStyle = TEXT;
+  ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.to || "—", L + col4 * 1.5 + 40, y + 8, col4 - 20);
+
+  vline(ctx, L + col4 * 2.5, y, rowH);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("G.C. No.", L + col4 * 2.5 + 10, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.gcNumber || "—", L + col4 * 2.5 + 10, y + 24, col4 - 20);
+
+  vline(ctx, L + col4 * 3.3, y, rowH);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Article", L + col4 * 3.3 + 10, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.article || "—", L + col4 * 3.3 + 10, y + 24, col4 * 0.7 - 20);
+
+  y += rowH + 4;
+
+  // ── LORRY OWNER / DRIVER ROW ──────────────────────────────────────────────
+  hline(ctx, 30, y + rowH, W - 60);
+  const halfW = FW / 2;
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Lorry Owner Name :", L, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.lorryOwnerName || "—", L + 210, y + 6, halfW - 220);
+
+  vline(ctx, L + halfW, y, rowH);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Driver Name :", L + halfW + 10, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "600 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.driverName || "—", L + halfW + 160, y + 6, halfW - 170);
+
+  y += rowH + 4;
+
+  // ── CONSIGNOR ROW ─────────────────────────────────────────────────────────
+  hline(ctx, 30, y + rowH, W - 60);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Consignor M/S", L, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "600 22px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.consignor || "—", L + 175, y + 6, FW - 185);
+
+  y += rowH + 4;
+
+  // ── CONSIGNEE ROW ─────────────────────────────────────────────────────────
+  hline(ctx, 30, y + rowH, W - 60);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Consignee M/S", L, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "600 22px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.consignee || "—", L + 175, y + 6, FW - 185);
+
+  y += rowH + 4;
+
+  // ── DESCRIPTION ROW ──────────────────────────────────────────────────────
+  hline(ctx, 30, y + rowH, W - 60);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Description", L, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "500 20px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.description || "—", L + 140, y + 6, FW - 150);
+
+  y += rowH + 4;
+
+  // ── PER TON / WEIGHT ROW ─────────────────────────────────────────────────
+  hline(ctx, 30, y + rowH, W - 60);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Per Ton Rs.", L, y + 6);
+  ctx.fillStyle = TEXT; ctx.font = "700 22px Inter, Arial, sans-serif";
+  ctx.fillText(String(d.ratePerTon || "—"), L + 148, y + 6);
+  ctx.fillStyle = MUTED; ctx.font = "500 16px Inter, Arial, sans-serif";
+  ctx.fillText("P.M.T.", L + 148 + 100, y + 10);
+
+  vline(ctx, W / 2, y, rowH);
+  ctx.fillStyle = MUTED; ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`Weight.  ${String(d.weight || "—")} Tons`, L + FW, y + 12);
+  ctx.textAlign = "left";
+
+  y += rowH + 4;
+
+  // ── GR NOTICE ─────────────────────────────────────────────────────────────
+  const noticeH = 46;
+  hline(ctx, 30, y + noticeH, W - 60, BORDER, 2);
+  ctx.fillStyle = RED;
+  ctx.font = "700 22px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Goods Receipt should be arrived within 15 days", W / 2, y + 12);
+  ctx.textAlign = "left";
+
+  y += noticeH + 4;
+
+  // ── THREE-COLUMN BOTTOM SECTION ───────────────────────────────────────────
+  const BOTTOM_H = 360;
+  const leftW    = Math.round(FW * 0.37);
+  const midW     = Math.round(FW * 0.26);
+  const rightW   = FW - leftW - midW;
+
+  const colLX = L;
+  const colMX = L + leftW;
+  const colRX = L + leftW + midW;
+
+  // Outer box
+  ctx.strokeStyle = BORDER;
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(L, y, FW, BOTTOM_H);
+
+  // Column dividers
+  vline(ctx, colMX, y, BOTTOM_H);
+  vline(ctx, colRX, y, BOTTOM_H);
+
+  // LEFT COLUMN cells
+  const cellH = 62;
+  const cells = [
+    { label: "Net Freight", value: INR(d.netFreight) },
+    { label: "Advance", value: INR(d.advance) },
+    { label: "Balance", value: INR(d.balance) },
+    { label: "Paid at", value: d.paidAt || "—" },
+  ];
+  cells.forEach(({ label, value }, i) => {
+    const cy2 = y + i * cellH;
+    hline(ctx, colLX, cy2 + cellH, leftW, BORDER);
+    field(ctx, colLX + 10, cy2 + 8, leftW, label, value);
   });
 
-  // Footer
+  // Small text in left bottom
+  const termsY = y + cellH * 4 + 10;
   ctx.fillStyle = MUTED;
-  ctx.font = "400 10px Inter, Arial, sans-serif";
-  ctx.fillText(
-    `Generated: ${new Date().toLocaleString("en-IN")} — Computer-generated memo.`,
-    50, H - 55
-  );
+  ctx.font = "400 14px Inter, Arial, sans-serif";
+  ctx.fillText("I agree with terms and conditions overleaf", colLX + 10, termsY);
+  ctx.fillText("and abide by that Received the goods in", colLX + 10, termsY + 18);
+  ctx.fillText("good condition.", colLX + 10, termsY + 36);
+
+  // CENTRE COLUMN — Truck No.
+  hline(ctx, colMX, y + 50, midW, BORDER);
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Truck No.", colMX + midW / 2, y + 14);
+  ctx.fillStyle = TEXT;
+  ctx.font = "800 34px Inter, Courier New, monospace";
+  ctx.fillText(d.truckNumber || "—", colMX + midW / 2, y + 70);
+  ctx.textAlign = "left";
+
+  // RIGHT COLUMN cells
+  const rcells = [
+    { label: "Commission", value: INR(d.commission) },
+    { label: "Loading", value: INR(d.loadingCharges) },
+    { label: "Total Expenses", value: INR(d.totalExpenses) },
+  ];
+  rcells.forEach(({ label, value }, i) => {
+    const cy2 = y + i * cellH;
+    hline(ctx, colRX, cy2 + cellH, rightW, BORDER);
+    field(ctx, colRX + 10, cy2 + 8, rightW, label, value);
+  });
+
+  // Remarks in right column
+  const remarksY = y + cellH * 3 + 8;
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 16px Inter, Arial, sans-serif";
+  ctx.fillText("Remarks", colRX + 10, remarksY);
+  ctx.fillStyle = TEXT;
+  ctx.font = "400 16px Inter, Arial, sans-serif";
+  drawTruncated(ctx, d.remarks || "—", colRX + 10, remarksY + 20, rightW - 20);
+
+  y += BOTTOM_H + 4;
+
+  // ── SIGNATURES ────────────────────────────────────────────────────────────
+  const sigH = 150;
+  hline(ctx, 30, y + sigH, W - 60);
+  vline(ctx, W / 2, y, sigH);
+
+  const sigLineY = y + 100;
+
+  // Left — Driver
+  hline(ctx, L + 20, sigLineY, halfW - 60, "#374151", 1.2);
+  ctx.fillStyle = MUTED;
+  ctx.font = "500 17px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Signature of the Driver on behalf of the Owner.", L + halfW / 2, sigLineY + 12);
+  ctx.textAlign = "left";
+
+  // Right — Authorized
+  ctx.fillStyle = TEXT;
+  ctx.font = "600 18px Inter, Arial, sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText(`For ${company.name || "SAHIL ROAD LINES"}`, W - 50, H - 55);
+  ctx.fillText(`For. SAHIL ROAD LINES`, L + FW, y + 10);
+  ctx.textAlign = "left";
+
+  hline(ctx, W / 2 + 20, sigLineY, halfW - 60, "#374151", 1.2);
+  ctx.fillStyle = MUTED;
+  ctx.font = "500 17px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Authorised Signature", W / 2 + halfW / 2, sigLineY + 12);
+  ctx.textAlign = "left";
+
+  y += sigH + 4;
+
+  // ── FOOTER ────────────────────────────────────────────────────────────────
+  ctx.fillStyle = RED;
+  ctx.font = "700 20px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    "Return payment will not get without this Receipt and any other particulars",
+    W / 2, y + 10
+  );
   ctx.textAlign = "left";
 
   return canvas;
 }
 
+// ── Async (logo image support kept for legacy Settings logo) ─────────────────
+
 export async function renderMemoAsync(d: Dispatch, company: CompanyInfo): Promise<HTMLCanvasElement> {
-  const canvas = renderMemoToCanvas(d, company);
-  if (company.logo) {
-    await new Promise<void>((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const ctx = canvas.getContext("2d")!;
-        ctx.save();
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(50, 45, 100, 100);
-        const ratio = Math.min(90 / img.width, 90 / img.height);
-        const w = img.width * ratio;
-        const h = img.height * ratio;
-        ctx.drawImage(img, 50 + (100 - w) / 2, 45 + (100 - h) / 2, w, h);
-        ctx.restore();
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = company.logo;
-    });
-  }
-  return canvas;
+  // SRL logo is now drawn directly via canvas paths — no external image needed.
+  return renderMemoToCanvas(d, company);
 }
 
 export async function downloadMemoPNG(d: Dispatch, company: CompanyInfo) {
@@ -300,3 +500,4 @@ export async function printMemo(d: Dispatch, company: CompanyInfo) {
   </body></html>`);
   w.document.close();
 }
+

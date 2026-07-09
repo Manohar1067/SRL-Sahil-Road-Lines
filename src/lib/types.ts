@@ -1,4 +1,4 @@
-export type Status = "Shipped" | "Dispatched" | "Delivered" | "Payment Pending" | "Completed";
+export type Status = "Created" | "Dispatched" | "Delivered" | "Payment Pending" | "Completed";
 
 export interface Dispatch {
   id: string;

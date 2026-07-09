@@ -1,16 +1,17 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { useConsignees, useConsignors, useDispatches, useDrivers, useTrucks, nextReceiptNumber, uid } from "@/lib/store";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDispatches, useDrivers, useTrucks, nextReceiptNumber, uid } from "@/lib/store";
+import { useSettings } from "@/lib/store";
 import type { Dispatch } from "@/lib/types";
 import { formatINR } from "@/components/StatusBadge";
 
@@ -47,40 +48,17 @@ const empty: Dispatch = {
   loadingCharges: 0,
   totalExpenses: 0,
   remarks: "",
-  status: "Dispatched",
+  status: "Created",
   deliveryDate: "",
   locked: false,
   createdAt: "",
 };
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label} {required && <span className="text-destructive">*</span>}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Card className="border-0 shadow-sm">
-      <CardHeader className="border-b pb-3">
-        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 lg:grid-cols-3">{children}</CardContent>
-    </Card>
-  );
-}
-
 function NewDispatch() {
   const [dispatches, setDispatches] = useDispatches();
   const [trucks] = useTrucks();
   const [drivers] = useDrivers();
-  const [consignors] = useConsignors();
-  const [consignees] = useConsignees();
+  const [settings] = useSettings();
   const navigate = useNavigate();
 
   const [form, setForm] = useState<Dispatch>(empty);
@@ -89,9 +67,13 @@ function NewDispatch() {
     setForm((f) => ({ ...f, receiptNumber: nextReceiptNumber(dispatches) }));
   }, [dispatches.length]);
 
-  const update = <K extends keyof Dispatch>(k: K, v: Dispatch[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const update = <K extends keyof Dispatch>(k: K, v: Dispatch[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
-  const total = useMemo(() => Number(form.weight || 0) * Number(form.ratePerTon || 0), [form.weight, form.ratePerTon]);
+  const total = useMemo(
+    () => Number(form.weight || 0) * Number(form.ratePerTon || 0),
+    [form.weight, form.ratePerTon]
+  );
   const balance = useMemo(() => total - Number(form.advance || 0), [total, form.advance]);
   const totalExpenses = useMemo(
     () => Number(form.commission || 0) + Number(form.loadingCharges || 0),
@@ -100,13 +82,18 @@ function NewDispatch() {
 
   const onSave = () => {
     const required: [string, any][] = [
-      ["Consignor", form.consignor], ["Consignee", form.consignee], ["Truck Number", form.truckNumber],
-      ["Driver", form.driverName], ["Weight", form.weight], ["Rate Per Ton", form.ratePerTon], ["Dispatch Date", form.date],
+      ["Consignor", form.consignor],
+      ["Consignee", form.consignee],
+      ["Truck Number", form.truckNumber],
+      ["Driver", form.driverName],
+      ["Weight", form.weight],
+      ["Rate Per Ton", form.ratePerTon],
+      ["Dispatch Date", form.date],
       ["Material", form.article],
     ];
     const missing = required.filter(([, v]) => !v || (typeof v === "number" && v <= 0));
     if (missing.length) {
-      toast.error(`Please fill required fields: ${missing.map(([k]) => k).join(", ")}`);
+      toast.error(`Please fill: ${missing.map(([k]) => k).join(", ")}`);
       return;
     }
     const dispatch: Dispatch = {
@@ -115,97 +102,237 @@ function NewDispatch() {
       netFreight: total,
       balance,
       totalExpenses,
-      status: "Dispatched",
+      status: "Created",
       deliveryDate: "",
       locked: true,
       createdAt: new Date().toISOString(),
     };
     setDispatches([dispatch, ...dispatches]);
-    toast.success(`Dispatch ${dispatch.receiptNumber} saved successfully`);
+    toast.success(`Dispatch ${dispatch.receiptNumber} saved`);
     navigate({ to: "/consignments" });
   };
 
+  const truckOptions = trucks.map((t) => ({ value: t.truckNumber, label: t.truckNumber }));
+  const driverOptions = drivers.map((d) => ({ value: d.name, label: d.name }));
+
   return (
     <AppShell title="New Dispatch" breadcrumb={["Home", "Dispatches", "New"]}>
-      <div className="mx-auto max-w-6xl space-y-5">
-        <Section title="Dispatch Information">
-          <Field label="Dispatch Memo Number"><Input value={form.receiptNumber} readOnly className="bg-muted font-mono" /></Field>
-          <Field label="Dispatch Date" required><Input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></Field>
-          <Field label="Documentation Date"><Input type="date" value={form.documentationDate || ""} onChange={(e) => update("documentationDate", e.target.value)} /></Field>
-          <Field label="Invoice Date"><Input type="date" value={form.invoiceDate || ""} onChange={(e) => update("invoiceDate", e.target.value)} /></Field>
-          <Field label="From"><Input value={form.from} onChange={(e) => update("from", e.target.value)} placeholder="Origin city" /></Field>
-          <Field label="To" required><Input value={form.to} onChange={(e) => update("to", e.target.value)} placeholder="Destination city" /></Field>
-        </Section>
+      <div className="mx-auto max-w-4xl space-y-5">
 
-        <Section title="Vehicle Information">
-          <Field label="Truck Number" required>
-            <Select value={form.truckNumber} onValueChange={(v) => {
-              const t = trucks.find((x) => x.truckNumber === v);
-              update("truckNumber", v);
-              if (t) { update("driverName", t.driver); update("lorryOwnerName", t.ownerName); }
-            }}>
-              <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
-              <SelectContent>{trucks.map((t) => <SelectItem key={t.id} value={t.truckNumber}>{t.truckNumber}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-          <Field label="Driver Name" required>
-            <Select value={form.driverName} onValueChange={(v) => update("driverName", v)}>
-              <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
-              <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-          <Field label="Lorry Owner Name"><Input value={form.lorryOwnerName} onChange={(e) => update("lorryOwnerName", e.target.value)} /></Field>
-        </Section>
+        {/* DISPATCH INFO */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">Dispatch Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Memo # (auto)</Label>
+              <Input value={form.receiptNumber} readOnly className="bg-muted font-mono font-bold" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Dispatch Date <span className="text-destructive">*</span></Label>
+              <Input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">G.C. Number</Label>
+              <Input value={form.gcNumber} onChange={(e) => update("gcNumber", e.target.value)} placeholder="GC number" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">From</Label>
+              <Input value={form.from} onChange={(e) => update("from", e.target.value)} placeholder="Origin" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">To</Label>
+              <Input value={form.to} onChange={(e) => update("to", e.target.value)} placeholder="Destination" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <Section title="Customer Information">
-          <Field label="Consignor" required>
-            <Select value={form.consignor} onValueChange={(v) => update("consignor", v)}>
-              <SelectTrigger><SelectValue placeholder="Select consignor" /></SelectTrigger>
-              <SelectContent>{consignors.map((c) => <SelectItem key={c.id} value={c.companyName}>{c.companyName}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-          <Field label="Consignee" required>
-            <Select value={form.consignee} onValueChange={(v) => update("consignee", v)}>
-              <SelectTrigger><SelectValue placeholder="Select consignee" /></SelectTrigger>
-              <SelectContent>{consignees.map((c) => <SelectItem key={c.id} value={c.companyName}>{c.companyName}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-        </Section>
+        {/* VEHICLE INFO */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">Vehicle Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Truck Number <span className="text-destructive">*</span></Label>
+              <Select
+                value={form.truckNumber}
+                onValueChange={(v) => {
+                  const t = trucks.find((x) => x.truckNumber === v);
+                  update("truckNumber", v);
+                  if (t) {
+                    update("driverName", t.driver);
+                    update("lorryOwnerName", t.ownerName);
+                  }
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
+                <SelectContent>
+                  {truckOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Driver Name <span className="text-destructive">*</span></Label>
+              <Select value={form.driverName} onValueChange={(v) => update("driverName", v)}>
+                <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
+                <SelectContent>
+                  {driverOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Lorry Owner Name</Label>
+              <Input value={form.lorryOwnerName} onChange={(e) => update("lorryOwnerName", e.target.value)} placeholder="Owner name" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <Section title="Goods Information">
-          <Field label="Material" required>
-            <Input value={form.article} onChange={(e) => update("article", e.target.value)} placeholder="e.g. Steel Bars, Cement, Rice Bags" />
-          </Field>
-          <Field label="Weight (Tons)" required><Input type="number" min={0} step="0.01" value={form.weight || ""} onChange={(e) => update("weight", Number(e.target.value))} /></Field>
-          <Field label="Rate Per Ton (₹)" required><Input type="number" min={0} value={form.ratePerTon || ""} onChange={(e) => update("ratePerTon", Number(e.target.value))} /></Field>
-          <Field label="Total Freight (Auto)">
-            <Input value={formatINR(total)} readOnly className="bg-primary-soft font-semibold text-primary" />
-          </Field>
-          <div className="md:col-span-2 lg:col-span-3">
-            <Field label="Additional Notes"><Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Optional description" /></Field>
-          </div>
-        </Section>
+        {/* CUSTOMER INFO */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">Customer Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Consignor M/S <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.consignor}
+                onChange={(e) => update("consignor", e.target.value)}
+                placeholder="Enter consignor name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Consignee M/S <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.consignee}
+                onChange={(e) => update("consignee", e.target.value)}
+                placeholder="Enter consignee name"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        <Section title="Payment Information">
-          <Field label="Total Freight (Auto)"><Input value={formatINR(total)} readOnly className="bg-primary-soft font-semibold text-primary" /></Field>
-          <Field label="Advance"><Input type="number" min={0} value={form.advance || ""} onChange={(e) => update("advance", Number(e.target.value))} /></Field>
-          <Field label="Balance (Auto)"><Input value={formatINR(balance)} readOnly className="bg-primary-soft font-semibold text-primary" /></Field>
-          <Field label="Paid At"><Input value={form.paidAt} onChange={(e) => update("paidAt", e.target.value)} placeholder="e.g. Mumbai Office" /></Field>
-          <Field label="Commission"><Input type="number" min={0} value={form.commission || ""} onChange={(e) => update("commission", Number(e.target.value))} /></Field>
-          <Field label="Loading Charges"><Input type="number" min={0} value={form.loadingCharges || ""} onChange={(e) => update("loadingCharges", Number(e.target.value))} /></Field>
-          <Field label="Total Expenses (Auto)"><Input value={formatINR(totalExpenses)} readOnly className="bg-primary-soft font-semibold text-primary" /></Field>
-        </Section>
+        {/* GOODS INFO */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">Goods Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Material / Article <span className="text-destructive">*</span></Label>
+              <Input value={form.article} onChange={(e) => update("article", e.target.value)} placeholder="Material name" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Weight (Tons) <span className="text-destructive">*</span></Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.weight || ""}
+                onChange={(e) => update("weight", Number(e.target.value))}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Rate Per Ton (Rs.) <span className="text-destructive">*</span></Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.ratePerTon || ""}
+                onChange={(e) => update("ratePerTon", Number(e.target.value))}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5 md:col-span-3">
+              <Label className="text-xs uppercase text-muted-foreground">Description</Label>
+              <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Description of goods" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <Section title="Remarks">
-          <div className="md:col-span-2 lg:col-span-3">
-            <Field label="Remarks"><Textarea value={form.remarks} onChange={(e) => update("remarks", e.target.value)} rows={3} /></Field>
-          </div>
-        </Section>
+        {/* PAYMENT INFO */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">Payment Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Net Freight (auto)</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted px-3 font-semibold text-primary">
+                {formatINR(total)}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Advance</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.advance || ""}
+                onChange={(e) => update("advance", Number(e.target.value))}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Balance (auto)</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted px-3 font-semibold text-primary">
+                {formatINR(balance)}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Paid At</Label>
+              <Input value={form.paidAt} onChange={(e) => update("paidAt", e.target.value)} placeholder="Location" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Commission</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.commission || ""}
+                onChange={(e) => update("commission", Number(e.target.value))}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Loading Charges</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.loadingCharges || ""}
+                onChange={(e) => update("loadingCharges", Number(e.target.value))}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase text-muted-foreground">Total Expenses (auto)</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted px-3 font-semibold text-primary">
+                {formatINR(totalExpenses)}
+              </div>
+            </div>
+            <div className="space-y-1.5 md:col-span-3">
+              <Label className="text-xs uppercase text-muted-foreground">Remarks</Label>
+              <Textarea
+                value={form.remarks}
+                onChange={(e) => update("remarks", e.target.value)}
+                rows={3}
+                placeholder="Optional remarks"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="sticky bottom-0 -mx-4 flex items-center justify-end gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        {/* ACTION BUTTONS */}
+        <div className="flex items-center justify-end gap-3 pb-8">
           <Button variant="outline" onClick={() => navigate({ to: "/consignments" })}>Cancel</Button>
-          <Button onClick={onSave} size="lg">Save Dispatch</Button>
+          <Button onClick={onSave} className="bg-[#c0272d] hover:bg-[#a01f23] text-white px-8">
+            Save Dispatch
+          </Button>
         </div>
+
       </div>
     </AppShell>
   );

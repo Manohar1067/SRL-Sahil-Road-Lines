@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadMemoPDF, downloadMemoPNG, printMemo } from "@/lib/memo-render";
+import { SrlLogo } from "@/components/SrlLogo";
 
 export const Route = createFileRoute("/consignments/$id")({
   head: () => ({ meta: [{ title: "Dispatch Details — Sahil Road Lines" }] }),
@@ -154,7 +155,7 @@ function DispatchDetails() {
   const steps: TimelineStep[] = [
     { label: "Dispatch Created", icon: FileCheck2, done: true, hint: found.createdAt ? new Date(found.createdAt).toLocaleString("en-IN") : found.date },
     { label: "Advance Paid", icon: IndianRupee, done: advancePaid, hint: advancePaid ? formatINR(found.advance) : "Not yet" },
-    { label: "Shipped / Dispatched", icon: TruckIcon, done: true, hint: `${found.from || "—"} → ${found.to || "—"}` },
+    { label: "Dispatched", icon: TruckIcon, done: true, hint: `${found.from || "—"} → ${found.to || "—"}` },
     { label: "Delivered", icon: PackageCheck, done: delivered, hint: found.deliveryDate || (delivered ? "Delivered" : "Pending") },
     { label: "Remaining Amount Received", icon: IndianRupee, done: paidBalance, hint: paidBalance ? "Balance settled" : `Balance ${formatINR(found.balance)}` },
     { label: "Completed", icon: CheckCircle2, done: completed, hint: completed ? "Closed" : "Pending" },
@@ -291,66 +292,184 @@ function DispatchDetails() {
           </div>
         ) : (
           <>
-            <div className="print-area bg-white text-black space-y-5 p-2">
-              <Card className="border shadow-sm">
-                <CardHeader className="border-b bg-primary text-primary-foreground">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      {company.logo && <img src={company.logo} alt="logo" className="h-14 w-14 rounded bg-white object-contain p-1" />}
-                      <div>
-                        <CardTitle className="text-xl">{company.name}</CardTitle>
-                        <div className="text-xs opacity-90">Transport Contractors & Commission Agents</div>
-                        <div className="text-xs opacity-90">{company.address}</div>
-                        <div className="text-xs opacity-90">Phone: {company.phone} · GST: {company.gst} · Email: {company.email}</div>
-                        <div className="mt-1 text-xs font-semibold uppercase tracking-wider opacity-90">Goods Dispatch Memo</div>
+            <div className="print-area bg-white text-black">
+              {/* A4 paper memo replica */}
+              <div className="mx-auto max-w-[780px] bg-white border border-gray-300 font-sans text-[13px]">
+
+                {/* TOP INFO BAR */}
+                <div className="flex items-center justify-between border-b border-gray-300 px-4 py-1 text-[10px] text-gray-500">
+                  <span>* Subject to Visakhapatnam Jurisdiction</span>
+                  <span>Cell: {company.phone || ""}</span>
+                </div>
+
+                {/* HEADER */}
+                <div className="flex items-stretch border-b-2 border-blue-700">
+                  <div className="flex items-center justify-center border-r-2 border-blue-700 px-4 py-3">
+                    <SrlLogo size={72} />
+                  </div>
+                  <div className="flex flex-1 flex-col items-center justify-center py-2 text-center">
+                    <div className="text-2xl font-extrabold tracking-widest text-[#c0272d] leading-tight">SAHIL ROAD LINES</div>
+                    <div className="mt-0.5 bg-[#1a2e5e] text-white text-[10px] font-bold tracking-widest px-3 py-0.5 uppercase">
+                      Transport Contractors &amp; Commission Agents
+                    </div>
+                    <div className="mt-1 text-[10px] text-gray-600 leading-tight">{company.address || "Plot No.5, N.H.-5 Road, Opp. Radio Station, Kurmannapalem, Visakhapatnam - 530 046."}</div>
+                    {company.gst && <div className="mt-0.5 text-[10px] text-gray-600">GST: {company.gst}</div>}
+                  </div>
+                </div>
+
+                {/* MEMO NUMBER + DATE */}
+                <div className="flex items-center border-b border-gray-400 px-3 py-1 gap-2">
+                  <span className="text-sm font-semibold text-gray-700">No.</span>
+                  <span className="w-24 font-bold text-[#c0272d] text-base font-mono">{found.receiptNumber}</span>
+                  <div className="flex-1 text-center font-bold text-[#c0272d] text-sm uppercase tracking-wider">Goods Despatch Memo</div>
+                  <span className="text-sm text-gray-700">Date: {found.date}</span>
+                </div>
+
+                {/* ROUTE */}
+                <div className="flex border-b border-gray-400">
+                  <div className="flex flex-1 items-center gap-1 border-r border-gray-400 px-3 py-1">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">From</span>
+                    <span className="flex-1 font-medium">{found.from}</span>
+                    <span className="text-xs text-gray-600 whitespace-nowrap">to</span>
+                    <span className="flex-1 font-medium">{found.to}</span>
+                  </div>
+                  <div className="flex items-center gap-1 border-r border-gray-400 px-3 py-1 w-32">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">G.C. No.</span>
+                    <span>{found.gcNumber}</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-3 py-1 w-36">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">Article</span>
+                    <span>{found.article}</span>
+                  </div>
+                </div>
+
+                {/* LORRY OWNER / DRIVER */}
+                <div className="flex border-b border-gray-400">
+                  <div className="flex flex-1 items-center gap-1 border-r border-gray-400 px-3 py-1">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">Lorry Owner Name :</span>
+                    <span className="flex-1 font-medium">{found.lorryOwnerName}</span>
+                  </div>
+                  <div className="flex flex-1 items-center gap-1 px-3 py-1">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">Driver Name :</span>
+                    <span className="flex-1 font-medium">{found.driverName}</span>
+                  </div>
+                </div>
+
+                {/* CONSIGNOR */}
+                <div className="flex border-b border-gray-400 px-3 py-1 items-center gap-2">
+                  <span className="text-xs text-gray-600 whitespace-nowrap">Consignor M/S</span>
+                  <span className="flex-1 font-medium">{found.consignor}</span>
+                </div>
+
+                {/* CONSIGNEE */}
+                <div className="flex border-b border-gray-400 px-3 py-1 items-center gap-2">
+                  <span className="text-xs text-gray-600 whitespace-nowrap">Consignee M/S</span>
+                  <span className="flex-1 font-medium">{found.consignee}</span>
+                </div>
+
+                {/* DESCRIPTION */}
+                <div className="flex border-b border-gray-400 px-3 py-1 items-center gap-2">
+                  <span className="text-xs text-gray-600 whitespace-nowrap">Description</span>
+                  <span className="flex-1">{found.description}</span>
+                </div>
+
+                {/* PER TON / WEIGHT */}
+                <div className="flex border-b border-gray-400">
+                  <div className="flex flex-1 items-center gap-2 border-r border-gray-400 px-3 py-1">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">Per Ton Rs.</span>
+                    <span className="font-medium">{found.ratePerTon}</span>
+                    <span className="text-xs text-gray-500">P.M.T.</span>
+                  </div>
+                  <div className="flex flex-1 items-center gap-2 px-3 py-1">
+                    <span className="text-xs text-gray-600 whitespace-nowrap">Weight.</span>
+                    <span className="font-medium">{found.weight}</span>
+                    <span className="text-xs text-gray-500">Tons</span>
+                  </div>
+                </div>
+
+                {/* GR NOTICE */}
+                <div className="border-b-2 border-gray-400 px-3 py-1.5 text-center">
+                  <span className="font-bold text-[#c0272d] text-xs tracking-wide">Goods Receipt should be arrived within 15 days</span>
+                </div>
+
+                {/* THREE-COLUMN BOTTOM */}
+                <div className="flex border-b border-gray-400">
+                  {/* LEFT — Freight */}
+                  <div className="flex-1 border-r border-gray-400">
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Net Freight</div>
+                      <div className="text-sm font-bold">{formatINR(found.netFreight)}</div>
+                    </div>
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Advance</div>
+                      <div className="text-sm font-medium">{formatINR(found.advance)}</div>
+                    </div>
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Balance</div>
+                      <div className="text-sm font-bold">{formatINR(found.balance)}</div>
+                    </div>
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Paid at</div>
+                      <div className="text-sm">{found.paidAt}</div>
+                    </div>
+                    <div className="px-2 py-1 text-[9px] text-gray-500 leading-tight">
+                      I agree with terms and conditions overleaf and abide by that Received the goods in good condition.
+                    </div>
+                  </div>
+
+                  {/* CENTER — Truck */}
+                  <div className="w-36 border-r border-gray-400 flex flex-col items-center">
+                    <div className="border-b border-gray-400 w-full text-center py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Truck No.</div>
+                    </div>
+                    <div className="flex-1 flex items-center justify-center p-2">
+                      <div className="text-xl font-bold text-gray-800 text-center tracking-widest">
+                        {found.truckNumber}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-mono text-lg font-bold">{found.receiptNumber}</div>
-                      <div className="text-xs opacity-90">Dispatch Date: {found.date}</div>
+                  </div>
+
+                  {/* RIGHT — Expenses */}
+                  <div className="flex-1">
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Commission</div>
+                      <div className="text-sm">{formatINR(found.commission)}</div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-x-8 gap-y-0 p-6 md:grid-cols-2">
-                  <Row label="Dispatch Memo #" value={found.receiptNumber} mono />
-                  <Row label="Dispatch Date" value={found.date} />
-                  <Row label="Documentation Date" value={found.documentationDate || "—"} />
-                  <Row label="Invoice Date" value={found.invoiceDate || "—"} />
-                  <Row label="From" value={found.from} />
-                  <Row label="To" value={found.to} />
-                  <Row label="Truck Number" value={found.truckNumber} mono />
-                  <Row label="Driver Name" value={found.driverName} />
-                  <Row label="Lorry Owner" value={found.lorryOwnerName} />
-                  <Row label="Paid At" value={found.paidAt} />
-                  <Row label="Consignor" value={found.consignor} />
-                  <Row label="Consignee" value={found.consignee} />
-                  <Row label="Material" value={found.article} />
-                  <Row label="Additional Notes" value={found.description} />
-                  <Row label="Weight (Tons)" value={found.weight} />
-                  <Row label="Rate Per Ton" value={formatINR(found.ratePerTon)} />
-                  <Row label="Total Freight" value={<span className="font-bold">{formatINR(found.netFreight)}</span>} />
-                  <Row label="Advance" value={formatINR(found.advance)} />
-                  <Row label="Balance" value={<span className="font-bold">{formatINR(found.balance)}</span>} />
-                  <Row label="Commission" value={formatINR(found.commission)} />
-                  <Row label="Loading Charges" value={formatINR(found.loadingCharges)} />
-                  <Row label="Total Expenses" value={formatINR(found.totalExpenses)} />
-                  <Row label="Status" value={found.status} />
-                  <Row label="Delivery Date" value={found.deliveryDate || "Pending"} />
-                  <div className="md:col-span-2"><Row label="Remarks" value={found.remarks} /></div>
-                  <div className="md:col-span-2 mt-6 grid grid-cols-3 gap-6">
-                    {["Prepared By", "Driver Signature", "Authorized Signature"].map((s) => (
-                      <div key={s} className="pt-8">
-                        <div className="border-t border-gray-400" />
-                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600">{s}</div>
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Loading</div>
+                      <div className="text-sm">{formatINR(found.loadingCharges)}</div>
+                    </div>
+                    <div className="border border-gray-400 px-2 py-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Total Expenses</div>
+                      <div className="text-sm font-bold">{formatINR(found.totalExpenses)}</div>
+                    </div>
+                    {found.remarks && (
+                      <div className="border border-gray-400 px-2 py-1">
+                        <div className="text-[10px] text-gray-500 font-semibold uppercase">Remarks</div>
+                        <div className="text-xs">{found.remarks}</div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                  <div className="md:col-span-2 mt-3 flex items-center justify-between border-t pt-3">
-                    <div className="text-xs text-gray-600">Generated: {new Date().toLocaleString("en-IN")} — Computer-generated memo.</div>
-                    <div className="text-sm">For {company.name}</div>
+                </div>
+
+                {/* SIGNATURES */}
+                <div className="flex border-b border-gray-400">
+                  <div className="flex-1 border-r border-gray-400 px-3 py-4">
+                    <div className="mt-8 border-t border-gray-500" />
+                    <div className="mt-1 text-[10px] text-gray-500 text-center">Signature of the Driver on behalf of the Owner.</div>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex-1 px-3 py-4 flex flex-col justify-end">
+                    <div className="text-right text-xs text-gray-600 mb-1">For. <span className="font-bold text-[#c0272d]">SAHIL ROAD LINES</span></div>
+                    <div className="mt-6 border-t border-gray-500" />
+                    <div className="mt-1 text-[10px] text-gray-500 text-center">Authorised Signature</div>
+                  </div>
+                </div>
+
+                {/* FOOTER */}
+                <div className="px-3 py-1.5 text-center">
+                  <span className="text-[11px] font-bold text-[#c0272d]">Return payment will not get without this Receipt and any other particulars</span>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 no-print">
