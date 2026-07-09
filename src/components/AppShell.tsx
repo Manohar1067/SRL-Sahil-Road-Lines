@@ -36,6 +36,24 @@ export function AppShell({ children, title, breadcrumb }: { children: ReactNode;
     else document.documentElement.classList.remove("dark");
   }, [settings.darkMode]);
 
+  // Update favicon whenever logo changes
+  useEffect(() => {
+    const logo = settings.company.logo;
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    if (logo) {
+      link.href = logo;
+      link.type = "image/png";
+    } else {
+      link.href = "/favicon.ico";
+      link.type = "image/x-icon";
+    }
+  }, [settings.company.logo]);
+
   return (
     <div className="flex min-h-screen w-full bg-background">
       {/* Sidebar */}
