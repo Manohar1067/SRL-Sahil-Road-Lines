@@ -93,7 +93,10 @@ export function AdminLock({ children }: { children: ReactNode }) {
     setBusy(true);
     try {
       const h = await hashPin(pin);
-      const expected = settings.adminPinHash || (await hashPin(DEFAULT_PIN));
+      // Always read the PIN hash fresh from localStorage so a password update
+      // in Settings takes effect immediately without a page reload.
+      const fresh = readRawSettings();
+      const expected = fresh?.adminPinHash || settings.adminPinHash || (await hashPin(DEFAULT_PIN));
       if (h === expected) {
         setLocked(false);
         setWasAutoLocked(false);
