@@ -127,7 +127,7 @@ function ConsignmentList() {
 
     return rows;
   }, [dispatches, q, memo, status, truck, driver, consignor, consignee, destination, material,
-      dispatchDate, deliveryDate, docDate, invDate, minAmt, maxAmt, sortKey, sortDir]);
+    dispatchDate, deliveryDate, docDate, invDate, minAmt, maxAmt, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -224,7 +224,7 @@ function ConsignmentList() {
               <Input type="date" value={docDate} onChange={(e) => { setDocDate(e.target.value); setPage(1); }} />
             </div>
             <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Invoice Date</label>
+              <label className="text-[11px] font-medium uppercase text-muted-foreground">Final Payment Date</label>
               <Input type="date" value={invDate} onChange={(e) => { setInvDate(e.target.value); setPage(1); }} />
             </div>
             <div>
@@ -255,7 +255,7 @@ function ConsignmentList() {
               <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <Th label="Memo #" sk="receiptNumber" />
-                  <Th label="Date" sk="date" />
+
                   <Th label="Truck" sk="truckNumber" />
                   <Th label="Driver" sk="driverName" />
                   <Th label="Consignor" sk="consignor" />
@@ -267,7 +267,7 @@ function ConsignmentList() {
                   <Th label="Advance" sk="advance" />
                   <Th label="Balance" sk="balance" />
                   <Th label="Status" sk="status" />
-                  <th className="px-4 py-3">Dates</th>
+                  <th className="px-4 py-3">Updated Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y bg-card">
@@ -282,7 +282,7 @@ function ConsignmentList() {
                         {d.receiptNumber}
                       </button>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{d.date}</td>
+
                     <td className="px-4 py-3 font-mono text-xs">{d.truckNumber}</td>
                     <td className="px-4 py-3">{d.driverName}</td>
                     <td className="px-4 py-3 max-w-[140px] truncate" title={d.consignor}>{d.consignor}</td>

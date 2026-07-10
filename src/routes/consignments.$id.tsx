@@ -496,7 +496,7 @@ function DispatchDetails() {
               <Row label="Dispatch Memo #" value={found.receiptNumber} mono />
               <Row label="Dispatch Date" value={found.date} />
               <Row label="Documentation Date" value={found.documentationDate || "—"} />
-              <Row label="Invoice Date" value={found.invoiceDate || "—"} />
+              <Row label="Final Date" value={found.invoiceDate || "—"} />
               <Row label="From" value={found.from} />
               <Row label="To" value={found.to} />
             </SectionCard>

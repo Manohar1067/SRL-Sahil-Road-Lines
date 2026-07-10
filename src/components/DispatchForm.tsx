@@ -375,7 +375,7 @@ export function DispatchForm({
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase text-muted-foreground">Net Freight (auto)</Label>
+            <Label className="text-xs uppercase text-muted-foreground">Total (auto)</Label>
             <div className="flex h-10 items-center rounded-md border bg-muted px-3 font-semibold text-primary">
               {formatINR(total)}
             </div>
@@ -397,7 +397,7 @@ export function DispatchForm({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase text-muted-foreground">Invoice Date</Label>
+            <Label className="text-xs uppercase text-muted-foreground">Final Payment Date</Label>
             <Input
               type="date"
               value={form.invoiceDate || ""}
@@ -487,8 +487,8 @@ export function DispatchForm({
                   type="date"
                   value={
                     form.status === "Created" ? form.createdAt?.slice(0, 10) ?? ""
-                    : form.status === "Dispatched" ? form.date
-                    : form.deliveryDate || ""
+                      : form.status === "Dispatched" ? form.date
+                        : form.deliveryDate || ""
                   }
                   readOnly={form.status === "Created" || form.status === "Dispatched"}
                   className={form.status === "Created" || form.status === "Dispatched" ? "bg-muted" : ""}

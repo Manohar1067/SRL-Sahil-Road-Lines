@@ -1,6 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, FilePlus2, ClipboardList, Truck, Users, Building2,
+  LayoutDashboard, FilePlus2, ClipboardList, Truck, Building2,
   BookUser, BarChart3, Settings, Bell, Search, Moon, Sun, Menu, History, Trash2,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -17,8 +17,7 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dispatch/new", label: "New Dispatch", icon: FilePlus2 },
   { to: "/consignments", label: "Consignment List", icon: ClipboardList },
-  { to: "/trucks", label: "Truck Management", icon: Truck },
-  { to: "/drivers", label: "Driver Management", icon: Users },
+  { to: "/trucks", label: "Fleet Management", icon: Truck },
   { to: "/consignors", label: "Consignor Management", icon: Building2 },
   { to: "/consignees", label: "Consignee Management", icon: BookUser },
   { to: "/reports", label: "Reports", icon: BarChart3 },
