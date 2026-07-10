@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrucksRouteImport } from './routes/trucks'
+import { Route as TrashRouteImport } from './routes/trash'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as DriversRouteImport } from './routes/drivers'
@@ -17,6 +18,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConsignorsRouteImport } from './routes/consignors'
 import { Route as ConsignmentsRouteImport } from './routes/consignments'
 import { Route as ConsigneesRouteImport } from './routes/consignees'
+import { Route as AuditLogRouteImport } from './routes/audit-log'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConsignmentsIndexRouteImport } from './routes/consignments.index'
 import { Route as DispatchNewRouteImport } from './routes/dispatch.new'
@@ -25,6 +27,11 @@ import { Route as ConsignmentsIdRouteImport } from './routes/consignments.$id'
 const TrucksRoute = TrucksRouteImport.update({
   id: '/trucks',
   path: '/trucks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrashRoute = TrashRouteImport.update({
+  id: '/trash',
+  path: '/trash',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -62,6 +69,11 @@ const ConsigneesRoute = ConsigneesRouteImport.update({
   path: '/consignees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuditLogRoute = AuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -85,6 +97,7 @@ const ConsignmentsIdRoute = ConsignmentsIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/audit-log': typeof AuditLogRoute
   '/consignees': typeof ConsigneesRoute
   '/consignments': typeof ConsignmentsRouteWithChildren
   '/consignors': typeof ConsignorsRoute
@@ -92,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/drivers': typeof DriversRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/trash': typeof TrashRoute
   '/trucks': typeof TrucksRoute
   '/consignments/$id': typeof ConsignmentsIdRoute
   '/dispatch/new': typeof DispatchNewRoute
@@ -99,12 +113,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/audit-log': typeof AuditLogRoute
   '/consignees': typeof ConsigneesRoute
   '/consignors': typeof ConsignorsRoute
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/trash': typeof TrashRoute
   '/trucks': typeof TrucksRoute
   '/consignments/$id': typeof ConsignmentsIdRoute
   '/dispatch/new': typeof DispatchNewRoute
@@ -113,6 +129,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/audit-log': typeof AuditLogRoute
   '/consignees': typeof ConsigneesRoute
   '/consignments': typeof ConsignmentsRouteWithChildren
   '/consignors': typeof ConsignorsRoute
@@ -120,6 +137,7 @@ export interface FileRoutesById {
   '/drivers': typeof DriversRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/trash': typeof TrashRoute
   '/trucks': typeof TrucksRoute
   '/consignments/$id': typeof ConsignmentsIdRoute
   '/dispatch/new': typeof DispatchNewRoute
@@ -129,6 +147,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/audit-log'
     | '/consignees'
     | '/consignments'
     | '/consignors'
@@ -136,6 +155,7 @@ export interface FileRouteTypes {
     | '/drivers'
     | '/reports'
     | '/settings'
+    | '/trash'
     | '/trucks'
     | '/consignments/$id'
     | '/dispatch/new'
@@ -143,12 +163,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/audit-log'
     | '/consignees'
     | '/consignors'
     | '/dashboard'
     | '/drivers'
     | '/reports'
     | '/settings'
+    | '/trash'
     | '/trucks'
     | '/consignments/$id'
     | '/dispatch/new'
@@ -156,6 +178,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/audit-log'
     | '/consignees'
     | '/consignments'
     | '/consignors'
@@ -163,6 +186,7 @@ export interface FileRouteTypes {
     | '/drivers'
     | '/reports'
     | '/settings'
+    | '/trash'
     | '/trucks'
     | '/consignments/$id'
     | '/dispatch/new'
@@ -171,6 +195,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuditLogRoute: typeof AuditLogRoute
   ConsigneesRoute: typeof ConsigneesRoute
   ConsignmentsRoute: typeof ConsignmentsRouteWithChildren
   ConsignorsRoute: typeof ConsignorsRoute
@@ -178,6 +203,7 @@ export interface RootRouteChildren {
   DriversRoute: typeof DriversRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
+  TrashRoute: typeof TrashRoute
   TrucksRoute: typeof TrucksRoute
   DispatchNewRoute: typeof DispatchNewRoute
 }
@@ -189,6 +215,13 @@ declare module '@tanstack/react-router' {
       path: '/trucks'
       fullPath: '/trucks'
       preLoaderRoute: typeof TrucksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trash': {
+      id: '/trash'
+      path: '/trash'
+      fullPath: '/trash'
+      preLoaderRoute: typeof TrashRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -240,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsigneesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/audit-log': {
+      id: '/audit-log'
+      path: '/audit-log'
+      fullPath: '/audit-log'
+      preLoaderRoute: typeof AuditLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -287,6 +327,7 @@ const ConsignmentsRouteWithChildren = ConsignmentsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuditLogRoute: AuditLogRoute,
   ConsigneesRoute: ConsigneesRoute,
   ConsignmentsRoute: ConsignmentsRouteWithChildren,
   ConsignorsRoute: ConsignorsRoute,
@@ -294,6 +335,7 @@ const rootRouteChildren: RootRouteChildren = {
   DriversRoute: DriversRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
+  TrashRoute: TrashRoute,
   TrucksRoute: TrucksRoute,
   DispatchNewRoute: DispatchNewRoute,
 }

@@ -19,7 +19,7 @@ export function StatusBadge({ status }: { status: Status | string }) {
   );
 }
 
-export const STATUS_OPTIONS: Status[] = ["Created", "Dispatched", "Delivered", "Payment Pending", "Completed"];
+export const STATUS_OPTIONS: Status[] = ["Created", "Dispatched", "Shipped", "Delivered", "Payment Pending", "Completed"];
 
 export const formatINR = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);

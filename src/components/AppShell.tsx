@@ -1,10 +1,10 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, FilePlus2, ClipboardList, Truck, Users, Building2,
-  BookUser, BarChart3, Settings, Bell, Search, Moon, Sun, Menu,
+  BookUser, BarChart3, Settings, Bell, Search, Moon, Sun, Menu, History, Trash2,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { useSettings } from "@/lib/store";
+import { useSettings, useDispatches } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -22,14 +22,21 @@ const nav = [
   { to: "/consignors", label: "Consignor Management", icon: Building2 },
   { to: "/consignees", label: "Consignee Management", icon: BookUser },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/audit-log", label: "Audit Log", icon: History },
+  { to: "/trash", label: "Trash", icon: Trash2 },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function AppShell({ children, title, breadcrumb }: { children: ReactNode; title: string; breadcrumb?: string[] }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [settings, setSettings] = useSettings();
+  const [dispatches] = useDispatches();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
+
+  const alertCount =
+    dispatches.filter((d) => d.balance > 0).length +
+    dispatches.filter((d) => d.status === "Dispatched" || d.status === "Shipped").length;
 
   useEffect(() => {
     if (settings.darkMode) document.documentElement.classList.add("dark");
@@ -124,9 +131,13 @@ export function AppShell({ children, title, breadcrumb }: { children: ReactNode;
             >
               {settings.darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications" onClick={() => navigate({ to: "/dashboard" })}>
               <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
+              {alertCount > 0 && (
+                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white">
+                  {alertCount > 9 ? "9+" : alertCount}
+                </span>
+              )}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
