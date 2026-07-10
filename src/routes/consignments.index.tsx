@@ -12,6 +12,25 @@ import {
 } from "@/components/ui/select";
 import type { Dispatch } from "@/lib/types";
 
+/** Returns the most relevant date for a dispatch based on its current status.
+ *  "Shipped" has no dedicated date — returns null. */
+function statusDate(d: Dispatch): { label: string; value: string } | null {
+  switch (d.status) {
+    case "Created":
+      return { label: "Created", value: d.createdAt?.slice(0, 10) ?? d.date };
+    case "Dispatched":
+      return { label: "Dispatched", value: d.date };
+    case "Delivered":
+      return { label: "Delivered", value: d.deliveryDate || "—" };
+    case "Payment Pending":
+      return { label: "Pmt. Pending", value: d.deliveryDate || "—" };
+    case "Completed":
+      return { label: "Completed", value: d.deliveryDate || "—" };
+    default:
+      return null; // Shipped
+  }
+}
+
 export const Route = createFileRoute("/consignments/")({
   head: () => ({ meta: [{ title: "Consignments — Sahil Road Lines" }] }),
   component: ConsignmentList,
@@ -248,7 +267,7 @@ function ConsignmentList() {
                   <Th label="Advance" sk="advance" />
                   <Th label="Balance" sk="balance" />
                   <Th label="Status" sk="status" />
-                  <th className="px-4 py-3">Delivery</th>
+                  <th className="px-4 py-3">Dates</th>
                 </tr>
               </thead>
               <tbody className="divide-y bg-card">
@@ -276,9 +295,16 @@ function ConsignmentList() {
                     <td className="px-4 py-3 text-right">{formatINR(d.balance)}</td>
                     <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {d.deliveryDate
-                        ? d.deliveryDate
-                        : <span className="text-xs text-muted-foreground">Pending</span>}
+                      {(() => {
+                        const sd = statusDate(d);
+                        if (!sd) return <span className="text-xs text-muted-foreground">—</span>;
+                        return (
+                          <span className="text-xs">
+                            <span className="block font-medium text-foreground">{sd.value}</span>
+                            <span className="text-muted-foreground">{sd.label}</span>
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}

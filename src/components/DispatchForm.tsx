@@ -181,26 +181,6 @@ export function DispatchForm({
             <Input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase text-muted-foreground">Documentation Date</Label>
-            <Input
-              type="date"
-              value={form.documentationDate || ""}
-              onChange={(e) => update("documentationDate", e.target.value)}
-              readOnly={isEdit}
-              className={isEdit ? "bg-muted" : ""}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs uppercase text-muted-foreground">Invoice Date</Label>
-            <Input
-              type="date"
-              value={form.invoiceDate || ""}
-              onChange={(e) => update("invoiceDate", e.target.value)}
-              readOnly={isEdit}
-              className={isEdit ? "bg-muted" : ""}
-            />
-          </div>
-          <div className="space-y-1.5">
             <Label className="text-xs uppercase text-muted-foreground">G.C. Number</Label>
             <Input
               value={form.gcNumber}
@@ -367,7 +347,15 @@ export function DispatchForm({
               placeholder="0"
             />
           </div>
-          <div className="space-y-1.5 md:col-span-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase text-muted-foreground">Documentation Date</Label>
+            <Input
+              type="date"
+              value={form.documentationDate || ""}
+              onChange={(e) => update("documentationDate", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
             <Label className="text-xs uppercase text-muted-foreground">Description</Label>
             <Input
               value={form.description}
@@ -407,6 +395,14 @@ export function DispatchForm({
             <div className="flex h-10 items-center rounded-md border bg-muted px-3 font-semibold text-primary">
               {formatINR(balance)}
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase text-muted-foreground">Invoice Date</Label>
+            <Input
+              type="date"
+              value={form.invoiceDate || ""}
+              onChange={(e) => update("invoiceDate", e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs uppercase text-muted-foreground">Paid At</Label>
@@ -454,12 +450,12 @@ export function DispatchForm({
         </CardContent>
       </Card>
 
-      {/* STATUS — edit only */}
+      {/* DATES & STATUS — edit only */}
       {isEdit && (
         <Card className="border-0 shadow-sm">
           <CardHeader className="border-b pb-3">
             <CardTitle className="text-sm font-semibold uppercase tracking-wider text-primary">
-              Delivery Status
+              Dates &amp; Status
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
@@ -478,17 +474,32 @@ export function DispatchForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase text-muted-foreground">
-                Delivery Date{" "}
-                {requiresDelivery(form.status) && <span className="text-destructive">*</span>}
-              </Label>
-              <Input
-                type="date"
-                value={form.deliveryDate || ""}
-                onChange={(e) => update("deliveryDate", e.target.value)}
-              />
-            </div>
+            {form.status !== "Shipped" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase text-muted-foreground">
+                  {form.status === "Created" && "Created Date"}
+                  {form.status === "Dispatched" && "Dispatch Date"}
+                  {form.status === "Delivered" && <>Delivered Date <span className="text-destructive">*</span></>}
+                  {form.status === "Payment Pending" && <>Payment Pending Date <span className="text-destructive">*</span></>}
+                  {form.status === "Completed" && <>Completed Date <span className="text-destructive">*</span></>}
+                </Label>
+                <Input
+                  type="date"
+                  value={
+                    form.status === "Created" ? form.createdAt?.slice(0, 10) ?? ""
+                    : form.status === "Dispatched" ? form.date
+                    : form.deliveryDate || ""
+                  }
+                  readOnly={form.status === "Created" || form.status === "Dispatched"}
+                  className={form.status === "Created" || form.status === "Dispatched" ? "bg-muted" : ""}
+                  onChange={(e) => {
+                    if (form.status !== "Created" && form.status !== "Dispatched") {
+                      update("deliveryDate", e.target.value);
+                    }
+                  }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

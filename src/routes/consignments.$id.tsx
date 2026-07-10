@@ -561,9 +561,21 @@ function DispatchDetails() {
               <div className="md:col-span-2"><Row label="Remarks" value={found.remarks} /></div>
             </SectionCard>
 
-            <SectionCard title="Delivery Information">
+            <SectionCard title="Dates &amp; Status">
               <Row label="Status" value={<StatusBadge status={found.status} />} />
-              <Row label="Delivery Date" value={found.deliveryDate || "Pending"} />
+              {found.status !== "Shipped" && (() => {
+                const dateLabel =
+                  found.status === "Created" ? "Created Date" :
+                  found.status === "Dispatched" ? "Dispatch Date" :
+                  found.status === "Delivered" ? "Delivered Date" :
+                  found.status === "Payment Pending" ? "Payment Pending Date" :
+                  "Completed Date";
+                const dateValue =
+                  found.status === "Created" ? (found.createdAt?.slice(0, 10) ?? found.date) :
+                  found.status === "Dispatched" ? found.date :
+                  found.deliveryDate || "—";
+                return <Row label={dateLabel} value={dateValue} />;
+              })()}
             </SectionCard>
           </div>
 
