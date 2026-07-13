@@ -61,6 +61,7 @@ function FleetManagementPage() {
         <CrudTable<Truck>
           title="Truck"
           addLabel="Add Truck"
+          entityName="truck"
           rows={trucks}
           setRows={setTrucks}
           empty={{ truckNumber: "", ownerName: "", driver: "", status: "Available" }}
@@ -68,13 +69,13 @@ function FleetManagementPage() {
             { key: "truckNumber", label: "Truck Number" },
             { key: "ownerName", label: "Owner Name" },
             { key: "driver", label: "Driver" },
-            { key: "status", label: "Status" },
           ]}
         />
       ) : (
         <CrudTable<Driver>
           title="Driver"
           addLabel="Add Driver"
+          entityName="driver"
           rows={drivers}
           setRows={setDrivers}
           empty={{ name: "", phone: "", licenseNumber: "", assignedTruck: "", status: "Active" }}
@@ -83,7 +84,6 @@ function FleetManagementPage() {
             { key: "phone", label: "Phone Number" },
             { key: "licenseNumber", label: "License Number" },
             { key: "assignedTruck", label: "Assigned Truck" },
-            { key: "status", label: "Status" },
           ]}
         />
       )}

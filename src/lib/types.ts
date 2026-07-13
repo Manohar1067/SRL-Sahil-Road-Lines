@@ -4,7 +4,9 @@ export type Status =
   | "Shipped"
   | "Delivered"
   | "Payment Pending"
-  | "Completed";
+  | "Completed"
+  | "LR Received"
+  | "LR Submitted";
 
 export interface StatusEvent {
   status: Status;
@@ -28,12 +30,12 @@ export interface AuditEntry {
 export interface Dispatch {
   id: string;
   receiptNumber: string; // Dispatch Memo Number, e.g. SRL-2026-000001
-  date: string; // Dispatch Date
-  documentationDate?: string;
-  invoiceDate?: string;
+  date: string; // Dispatch Date — DD/MM/YYYY
+  documentationDate?: string; // DD/MM/YYYY
+  invoiceDate?: string;       // legacy, kept for compat
   from: string;
   to: string;
-  gcNumber: string; // legacy, kept for backwards compatibility
+  gcNumber: string; // legacy, hidden from UI
   article: string; // Material
   truckNumber: string;
   driverName: string;
@@ -43,22 +45,27 @@ export interface Dispatch {
   description: string;
   weight: number;
   ratePerTon: number;
-  netFreight: number; // Total Freight = weight × ratePerTon
+  netFreight: number;      // Total Freight = weight × ratePerTon (editable)
   advance: number;
-  balance: number; // netFreight - advance
-  paidAt: string;
+  balance: number;         // netFreight - advance
+  paidAt: string;          // "Paid By" in UI (Sahil / Kamesh / custom)
   commission: number;
   loadingCharges: number;
-  totalExpenses: number; // commission + loadingCharges
-  // Internal financial fields — NEVER shown on PDF/Print/PNG
-  bargainAmount?: number; // Amount negotiated down with driver
-  finalPayable?: number; // balance - bargainAmount
+  tds?: number;            // TDS
+  goodsMamuli?: number;    // Goods Mamuli
+  localDriverGuide?: number; // Local Driver Guide
+  detentionCharges?: number; // Detention Charges
+  totalExpenses: number;   // commission + loadingCharges + tds + goodsMamuli + localDriverGuide + detentionCharges (editable)
+  bargainAmount?: number;  // legacy — kept for backward compat
+  finalPayable?: number;   // balance − totalExpenses (editable)
+  finalPaymentDate?: string; // DD/MM/YYYY
   remarks: string;
   status: Status;
-  statusHistory?: StatusEvent[]; // complete status change audit trail
-  deliveryDate?: string;
+  statusHistory?: StatusEvent[];
+  deliveryDate?: string;   // DD/MM/YYYY
+  unloadingDate?: string;  // DD/MM/YYYY
   locked?: boolean;
-  deletedAt?: string; // soft delete timestamp; undefined = active
+  deletedAt?: string;
   createdAt: string;
 }
 
@@ -86,3 +93,4 @@ export interface Party {
   gst: string;
   address: string;
 }
+

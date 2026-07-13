@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAllDispatches, useDrivers, useTrucks, useSettings, addAuditEntry } from "@/lib/store";
+import { useAllDispatches, useDrivers, useTrucks, useSettings, useConsignors, useConsignees, addAuditEntry } from "@/lib/store";
 import type { Dispatch, Status } from "@/lib/types";
 import { StatusBadge, STATUS_OPTIONS, formatINR } from "@/components/StatusBadge";
 import {
@@ -120,6 +120,8 @@ function DispatchDetails() {
   const [trucks] = useTrucks();
   const [drivers] = useDrivers();
   const [settings] = useSettings();
+  const [consignors] = useConsignors();
+  const [consignees] = useConsignees();
   const navigate = useNavigate();
   const found = allDispatches.find((d) => d.id === id);
   const [editing, setEditing] = useState(false);
@@ -249,6 +251,8 @@ function DispatchDetails() {
           dispatches={allDispatches.filter((d) => !d.deletedAt)}
           trucks={trucks}
           drivers={drivers}
+          consignors={consignors}
+          consignees={consignees}
           settings={settings}
           onSave={onSaveEdit}
           onCancel={() => setEditing(false)}

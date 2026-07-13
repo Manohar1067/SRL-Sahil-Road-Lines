@@ -3,7 +3,7 @@ import {
   LayoutDashboard, FilePlus2, ClipboardList, Truck, Building2,
   BookUser, BarChart3, Settings, Bell, Search, Moon, Sun, Menu, History, Trash2,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSettings, useDispatches } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +31,18 @@ export function AppShell({ children, title, breadcrumb }: { children: ReactNode;
   const [settings, setSettings] = useSettings();
   const [dispatches] = useDispatches();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  const submitSearch = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const q = searchQ.trim();
+    if (!q) return;
+    navigate({ to: "/consignments", search: { q } } as any);
+    setSearchQ("");
+    searchRef.current?.blur();
+  };
 
   const alertCount =
     dispatches.filter((d) => d.balance > 0).length +
@@ -117,10 +128,22 @@ export function AppShell({ children, title, breadcrumb }: { children: ReactNode;
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen((v) => !v)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="relative hidden flex-1 max-w-md md:block">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search dispatches, trucks, drivers…" className="pl-9" />
-          </div>
+          <form onSubmit={submitSearch} className="relative hidden flex-1 max-w-md md:block">
+            <button
+              type="submit"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <Input
+              ref={searchRef}
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Search dispatches… (Enter to go)"
+              className="pl-9 pr-3"
+            />
+          </form>
           <div className="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"

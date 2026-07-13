@@ -198,7 +198,7 @@ export function ensureSeed() {
         const nd: any = { ...d };
         // Status name migrations
         if (nd.status === "Pending") { nd.status = "Dispatched"; changed = true; }
-        if (nd.status === "In Transit") { nd.status = "Shipped"; changed = true; }
+        if (nd.status === "In Transit") { nd.status = "Dispatched"; changed = true; }
         if (nd.status === "Cancelled") { nd.status = "Payment Pending"; changed = true; }
         // Receipt number format upgrade: SRL-0001 → SRL-2026-000001
         if (typeof nd.receiptNumber === "string" && /^SRL-\d{4}$/.test(nd.receiptNumber)) {
@@ -206,18 +206,25 @@ export function ensureSeed() {
           nd.receiptNumber = `SRL-${year}-${String(n).padStart(6, "0")}`;
           changed = true;
         }
+        // Add missing fields with defaults
         if (nd.deliveryDate === undefined) { nd.deliveryDate = ""; changed = true; }
+        if (nd.unloadingDate === undefined) { nd.unloadingDate = ""; changed = true; }
         if (nd.documentationDate === undefined) { nd.documentationDate = nd.date || ""; changed = true; }
         if (nd.invoiceDate === undefined) { nd.invoiceDate = nd.date || ""; changed = true; }
-        if (nd.tds !== undefined) { delete nd.tds; changed = true; }
-        if (nd.officeMamuli !== undefined) { delete nd.officeMamuli; changed = true; }
-        if (nd.localDriverGuide !== undefined) { delete nd.localDriverGuide; changed = true; }
-        const newTotal = Number(nd.commission || 0) + Number(nd.loadingCharges || 0);
-        if (nd.totalExpenses !== newTotal) { nd.totalExpenses = newTotal; changed = true; }
-        // Add new internal fields if missing
+        if (nd.tds === undefined) { nd.tds = 0; changed = true; }
+        if (nd.goodsMamuli === undefined) { nd.goodsMamuli = 0; changed = true; }
+        if (nd.localDriverGuide === undefined) { nd.localDriverGuide = 0; changed = true; }
+        if (nd.detentionCharges === undefined) { nd.detentionCharges = 0; changed = true; }
+        if (nd.finalPaymentDate === undefined) { nd.finalPaymentDate = ""; changed = true; }
         if (nd.bargainAmount === undefined) { nd.bargainAmount = 0; changed = true; }
+        // Recalculate totalExpenses with full 6-component formula
+        const newTotal = Number(nd.commission || 0) + Number(nd.loadingCharges || 0)
+          + Number(nd.tds || 0) + Number(nd.goodsMamuli || 0)
+          + Number(nd.localDriverGuide || 0) + Number(nd.detentionCharges || 0);
+        if (nd.totalExpenses !== newTotal) { nd.totalExpenses = newTotal; changed = true; }
+        // Recalculate finalPayable = balance - totalExpenses
         if (nd.finalPayable === undefined) {
-          nd.finalPayable = Number(nd.balance || 0) - Number(nd.bargainAmount || 0);
+          nd.finalPayable = Number(nd.balance || 0) - Number(nd.totalExpenses || 0);
           changed = true;
         }
         if (!nd.statusHistory) {

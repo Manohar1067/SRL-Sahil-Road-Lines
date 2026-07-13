@@ -7,6 +7,8 @@ import {
   useDrivers,
   useTrucks,
   useSettings,
+  useConsignors,
+  useConsignees,
   addAuditEntry,
 } from "@/lib/store";
 import type { Dispatch } from "@/lib/types";
@@ -21,6 +23,8 @@ function NewDispatch() {
   const [trucks] = useTrucks();
   const [drivers] = useDrivers();
   const [settings] = useSettings();
+  const [consignors] = useConsignors();
+  const [consignees] = useConsignees();
   const navigate = useNavigate();
 
   const handleSave = (dispatch: Dispatch) => {
@@ -43,6 +47,8 @@ function NewDispatch() {
         dispatches={dispatches}
         trucks={trucks}
         drivers={drivers}
+        consignors={consignors}
+        consignees={consignees}
         settings={settings}
         onSave={handleSave}
         onCancel={() => navigate({ to: "/consignments" })}

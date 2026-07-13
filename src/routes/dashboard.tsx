@@ -1,17 +1,17 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useDispatches, useTrucks, useDrivers } from "@/lib/store";
-import { StatusBadge, formatINR } from "@/components/StatusBadge";
+import { formatINR } from "@/components/StatusBadge";
 import {
   Truck, Users, IndianRupee, PackageCheck, PackageSearch,
   Clock, Wallet, FilePlus2, TrendingUp, TrendingDown,
   AlertCircle, Star, Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Sahil Road Lines TMS" }] }),
@@ -19,12 +19,16 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Kpi({
-  label, value, icon: Icon, accent, badge, sub,
+  label, value, icon: Icon, accent, badge, sub, to,
 }: {
-  label: string; value: string; icon: any; accent: string; badge?: number; sub?: string;
+  label: string; value: string; icon: any; accent: string;
+  badge?: number; sub?: string; to?: string;
 }) {
-  return (
-    <Card className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
+  const inner = (
+    <Card className={cn(
+      "overflow-hidden border-0 shadow-sm transition-all",
+      to ? "cursor-pointer hover:shadow-md hover:ring-2 hover:ring-primary/20" : "hover:shadow-md"
+    )}>
       <CardContent className="flex items-center gap-4 p-5">
         <div className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-xl ${accent}`}>
           <Icon className="h-6 w-6" />
@@ -42,6 +46,8 @@ function Kpi({
       </CardContent>
     </Card>
   );
+  if (to) return <Link to={to as any}>{inner}</Link>;
+  return inner;
 }
 
 function Dashboard() {
@@ -92,11 +98,6 @@ function Dashboard() {
     };
   }, [dispatches, today, monthStart]);
 
-  const recent = useMemo(
-    () => [...dispatches].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
-    [dispatches]
-  );
-
   return (
     <AppShell title="Dashboard" breadcrumb={["Home", "Dashboard"]}>
       {/* Notification Banner */}
@@ -119,15 +120,16 @@ function Dashboard() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-        <Kpi label="Today's Dispatches" value={String(stats.todays.length)} icon={PackageSearch} accent="bg-primary/10 text-primary" />
-        <Kpi label="Today's Revenue" value={formatINR(stats.todayRevenue)} icon={IndianRupee} accent="bg-success/15 text-success" />
-        <Kpi label="Today's Expenses" value={formatINR(stats.todayExpenses)} icon={TrendingDown} accent="bg-destructive/10 text-destructive" />
+        <Kpi label="Today's Dispatches" value={String(stats.todays.length)} icon={PackageSearch} accent="bg-primary/10 text-primary" to="/consignments" />
+        <Kpi label="Today's Revenue" value={formatINR(stats.todayRevenue)} icon={IndianRupee} accent="bg-success/15 text-success" to="/reports" />
+        <Kpi label="Today's Expenses" value={formatINR(stats.todayExpenses)} icon={TrendingDown} accent="bg-destructive/10 text-destructive" to="/reports" />
         <Kpi
           label="Today's Profit"
           value={formatINR(stats.todayProfit)}
           icon={TrendingUp}
           accent={stats.todayProfit >= 0 ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive"}
           sub="Revenue − Expenses"
+          to="/reports"
         />
         <Kpi
           label="Running Trips"
@@ -135,14 +137,16 @@ function Dashboard() {
           icon={Truck}
           accent="bg-amber-100 text-amber-600 dark:bg-amber-950/30"
           badge={stats.running.length}
+          to="/consignments"
         />
-        <Kpi label="Completed Trips" value={String(stats.completed.length)} icon={PackageCheck} accent="bg-success/15 text-success" />
+        <Kpi label="Completed Trips" value={String(stats.completed.length)} icon={PackageCheck} accent="bg-success/15 text-success" to="/consignments" />
         <Kpi
           label="Pending Deliveries"
           value={String(stats.pendingDelivery.length)}
           icon={Clock}
           accent="bg-warning/20 text-warning-foreground"
           badge={stats.pendingDelivery.length}
+          to="/consignments"
         />
         <Kpi
           label="Pending Payments"
@@ -151,11 +155,12 @@ function Dashboard() {
           accent="bg-destructive/10 text-destructive"
           badge={stats.pendingPayment.length}
           sub={formatINR(stats.pendingPaymentTotal)}
+          to="/consignments"
         />
-        <Kpi label="Collection Due" value={formatINR(stats.collectionAmount)} icon={Wallet} accent="bg-purple-100 text-purple-600 dark:bg-purple-950/30" />
-        <Kpi label="Monthly Revenue" value={formatINR(stats.monthRevenue)} icon={IndianRupee} accent="bg-primary/10 text-primary" />
-        <Kpi label="Total Trucks" value={String(trucks.length)} icon={Truck} accent="bg-primary/10 text-primary" />
-        <Kpi label="Total Drivers" value={String(drivers.length)} icon={Users} accent="bg-accent text-accent-foreground" />
+        <Kpi label="Collection Due" value={formatINR(stats.collectionAmount)} icon={Wallet} accent="bg-purple-100 text-purple-600 dark:bg-purple-950/30" to="/consignments" />
+        <Kpi label="Monthly Revenue" value={formatINR(stats.monthRevenue)} icon={IndianRupee} accent="bg-primary/10 text-primary" to="/reports" />
+        <Kpi label="Total Trucks" value={String(trucks.length)} icon={Truck} accent="bg-primary/10 text-primary" to="/trucks" />
+        <Kpi label="Total Drivers" value={String(drivers.length)} icon={Users} accent="bg-accent text-accent-foreground" to="/trucks" />
       </div>
 
       {/* Top Performer Row */}
@@ -205,59 +210,6 @@ function Dashboard() {
           <Button size="sm" variant="outline" onClick={() => navigate({ to: "/reports" })}>
             Reports
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Recent Dispatches */}
-      <Card className="mt-6 border-0 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Recent Dispatches</CardTitle>
-          <Link to="/consignments" className="text-sm font-medium text-primary hover:underline">
-            View all →
-          </Link>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="min-w-full text-sm">
-            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Receipt</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Truck</th>
-                <th className="px-4 py-3">Driver</th>
-                <th className="px-4 py-3">Consignor</th>
-                <th className="px-4 py-3">Route</th>
-                <th className="px-4 py-3 text-right">Freight</th>
-                <th className="px-4 py-3 text-right">Balance</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {recent.map((d) => (
-                <tr
-                  key={d.id}
-                  className="cursor-pointer hover:bg-muted/40 transition-colors"
-                  onClick={() => navigate({ to: "/consignments/$id", params: { id: d.id } })}
-                >
-                  <td className="px-4 py-3 font-medium text-primary font-mono">{d.receiptNumber}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{d.date}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{d.truckNumber}</td>
-                  <td className="px-4 py-3">{d.driverName}</td>
-                  <td className="px-4 py-3 max-w-[120px] truncate" title={d.consignor}>{d.consignor}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{d.from} → {d.to}</td>
-                  <td className="px-4 py-3 text-right font-medium">{formatINR(d.netFreight)}</td>
-                  <td className={cn("px-4 py-3 text-right", d.balance > 0 ? "text-destructive font-semibold" : "text-muted-foreground")}>
-                    {formatINR(d.balance)}
-                  </td>
-                  <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
-                </tr>
-              ))}
-              {recent.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No dispatches yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </CardContent>
       </Card>
     </AppShell>

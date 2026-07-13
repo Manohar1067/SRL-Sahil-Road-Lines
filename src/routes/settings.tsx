@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useSettings, hashPin, exportAllData, importAllData } from "@/lib/store";
+import { useSettings, hashPin, exportAllData, importAllData, addAuditEntry } from "@/lib/store";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
 
@@ -20,8 +20,23 @@ function SettingsPage() {
   const logoRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const c = settings.company;
-  const setCompany = (patch: Partial<typeof c>) =>
-    setSettings({ ...settings, company: { ...c, ...patch } });
+
+  // Local draft for company info (save on button click)
+  const [draft, setDraft] = useState(c);
+  const setDraftField = (patch: Partial<typeof c>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const saveCompany = () => {
+    const old = settings.company;
+    setSettings({ ...settings, company: draft });
+    addAuditEntry({
+      action: "UPDATE",
+      entity: "settings",
+      entityId: "company",
+      oldValue: JSON.stringify(old),
+      newValue: JSON.stringify(draft),
+    });
+    toast.success("Company details saved");
+  };
 
   const [pin, setPin] = useState("");
   const [pin2, setPin2] = useState("");
@@ -30,7 +45,20 @@ function SettingsPage() {
   const onLogo = (f: File | null) => {
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => setCompany({ logo: String(reader.result || "") });
+    reader.onload = () => {
+      const logo = String(reader.result || "");
+      setDraft((d) => ({ ...d, logo }));
+      // Also save immediately
+      const updated = { ...settings, company: { ...draft, logo } };
+      setSettings(updated);
+      addAuditEntry({
+        action: "UPDATE",
+        entity: "settings",
+        entityId: "logo",
+        oldValue: JSON.stringify({ logo: settings.company.logo ? "(previous logo)" : "" }),
+        newValue: JSON.stringify({ logo: "(new logo uploaded)" }),
+      });
+    };
     reader.readAsDataURL(f);
   };
 
@@ -39,13 +67,27 @@ function SettingsPage() {
     if (pin !== pin2) return toast.error("PINs do not match");
     const h = await hashPin(pin);
     setSettings({ ...settings, adminPinHash: h, autoLockMinutes: Math.max(1, Number(autoLock) || 15) });
+    addAuditEntry({
+      action: "UPDATE",
+      entity: "settings",
+      entityId: "pin",
+      newValue: JSON.stringify({ adminPinHash: "(updated)", autoLockMinutes: Math.max(1, Number(autoLock) || 15) }),
+    });
     setPin(""); setPin2("");
     toast.success("Admin PIN updated");
   };
 
   const onSaveAutoLock = () => {
     const mins = Math.max(1, Number(autoLock) || 15);
+    const old = settings.autoLockMinutes;
     setSettings({ ...settings, autoLockMinutes: mins });
+    addAuditEntry({
+      action: "UPDATE",
+      entity: "settings",
+      entityId: "auto-lock",
+      oldValue: JSON.stringify({ autoLockMinutes: old }),
+      newValue: JSON.stringify({ autoLockMinutes: mins }),
+    });
     toast.success(`Auto-lock set to ${mins} minutes`);
   };
 
@@ -59,6 +101,12 @@ function SettingsPage() {
       a.download = `sahil-roadlines-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      addAuditEntry({
+        action: "CREATE",
+        entity: "settings",
+        entityId: "backup",
+        newValue: JSON.stringify({ action: "Backup exported", date: new Date().toISOString() }),
+      });
       toast.success("Backup exported");
     } catch {
       toast.error("Could not export backup");
@@ -71,6 +119,12 @@ function SettingsPage() {
     try {
       const text = await f.text();
       importAllData(text);
+      addAuditEntry({
+        action: "RESTORE",
+        entity: "settings",
+        entityId: "backup",
+        newValue: JSON.stringify({ action: "Backup restored", file: f.name, date: new Date().toISOString() }),
+      });
       toast.success("Backup restored. Reloading…");
       setTimeout(() => location.reload(), 700);
     } catch (e: any) {
@@ -94,37 +148,40 @@ function SettingsPage() {
           <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1.5 md:col-span-2">
               <Label className="text-xs uppercase text-muted-foreground">Company Name</Label>
-              <Input value={c.name} onChange={(e) => setCompany({ name: e.target.value })} />
+              <Input value={draft.name} onChange={(e) => setDraftField({ name: e.target.value })} />
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label className="text-xs uppercase text-muted-foreground">Address</Label>
-              <Textarea rows={2} value={c.address} onChange={(e) => setCompany({ address: e.target.value })} />
+              <Textarea rows={2} value={draft.address} onChange={(e) => setDraftField({ address: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs uppercase text-muted-foreground">Phone</Label>
-              <Input value={c.phone} onChange={(e) => setCompany({ phone: e.target.value })} />
+              <Input value={draft.phone} onChange={(e) => setDraftField({ phone: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs uppercase text-muted-foreground">GST Number</Label>
-              <Input value={c.gst} onChange={(e) => setCompany({ gst: e.target.value })} />
+              <Input value={draft.gst} onChange={(e) => setDraftField({ gst: e.target.value })} />
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label className="text-xs uppercase text-muted-foreground">Email</Label>
-              <Input type="email" value={c.email || ""} onChange={(e) => setCompany({ email: e.target.value })} />
+              <Input type="email" value={draft.email || ""} onChange={(e) => setDraftField({ email: e.target.value })} />
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label className="text-xs uppercase text-muted-foreground">Logo</Label>
               <div className="flex items-center gap-3">
-                {c.logo ? (
-                  <img src={c.logo} alt="logo" className="h-14 w-14 rounded border object-contain bg-white" />
+                {draft.logo ? (
+                  <img src={draft.logo} alt="logo" className="h-14 w-14 rounded border object-contain bg-white" />
                 ) : (
                   <div className="flex h-14 w-14 items-center justify-center rounded border bg-muted text-xs text-muted-foreground">No logo</div>
                 )}
                 <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0] || null)} />
                 <Button variant="outline" size="sm" onClick={() => logoRef.current?.click()}>Upload Logo</Button>
-                {c.logo && <Button variant="ghost" size="sm" onClick={() => setCompany({ logo: "" })}>Remove</Button>}
+                {draft.logo && <Button variant="ghost" size="sm" onClick={() => setDraftField({ logo: "" })}>Remove</Button>}
               </div>
               <p className="text-xs text-muted-foreground">Used on sidebar, dispatch memo, PDF, PNG and print — updates everywhere automatically.</p>
+            </div>
+            <div className="md:col-span-2">
+              <Button onClick={saveCompany}>Save Company Details</Button>
             </div>
           </CardContent>
         </Card>
@@ -162,7 +219,19 @@ function SettingsPage() {
               <Label className="text-sm font-medium">Dark Mode</Label>
               <p className="text-xs text-muted-foreground">Switch between light and dark themes.</p>
             </div>
-            <Switch checked={settings.darkMode} onCheckedChange={(v) => setSettings({ ...settings, darkMode: v })} />
+            <Switch
+              checked={settings.darkMode}
+              onCheckedChange={(v) => {
+                setSettings({ ...settings, darkMode: v });
+                addAuditEntry({
+                  action: "UPDATE",
+                  entity: "settings",
+                  entityId: "appearance",
+                  oldValue: JSON.stringify({ darkMode: settings.darkMode }),
+                  newValue: JSON.stringify({ darkMode: v }),
+                });
+              }}
+            />
           </CardContent>
         </Card>
 

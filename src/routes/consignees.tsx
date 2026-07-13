@@ -16,6 +16,7 @@ function ConsigneesPage() {
       <CrudTable<Party>
         title="Consignee"
         addLabel="Add Consignee"
+        entityName="consignee"
         rows={rows}
         setRows={setRows}
         empty={{ companyName: "", phone: "", gst: "", address: "" }}

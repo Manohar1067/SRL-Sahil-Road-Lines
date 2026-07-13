@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
+import { addAuditEntry } from "@/lib/store";
+import type { AuditEntry } from "@/lib/types";
 
 export interface CrudColumn<T> {
   key: keyof T;
@@ -27,9 +29,11 @@ interface Props<T extends { id: string }> {
   columns: CrudColumn<T>[];
   empty: Omit<T, "id">;
   addLabel: string;
+  /** When set, all CRD actions are written to the audit log */
+  entityName?: AuditEntry["entity"];
 }
 
-export function CrudTable<T extends { id: string }>({ title, rows, setRows, columns, empty, addLabel }: Props<T>) {
+export function CrudTable<T extends { id: string }>({ title, rows, setRows, columns, empty, addLabel, entityName }: Props<T>) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<T | null>(null);
   const [open, setOpen] = useState(false);
@@ -43,11 +47,30 @@ export function CrudTable<T extends { id: string }>({ title, rows, setRows, colu
       if (!form[c.key] && c.type !== "number") { toast.error(`${c.label} is required`); return; }
     }
     if (editing) {
-      setRows(rows.map((r) => r.id === editing.id ? { ...editing, ...form } : r));
+      const updated = { ...editing, ...form };
+      setRows(rows.map((r) => r.id === editing.id ? updated : r));
+      if (entityName) {
+        addAuditEntry({
+          action: "UPDATE",
+          entity: entityName,
+          entityId: editing.id,
+          oldValue: JSON.stringify(editing),
+          newValue: JSON.stringify(updated),
+        });
+      }
       toast.success(`${title} updated`);
     } else {
       const id = Math.random().toString(36).slice(2, 10);
-      setRows([{ ...(form as T), id }, ...rows]);
+      const created = { ...(form as T), id };
+      setRows([created, ...rows]);
+      if (entityName) {
+        addAuditEntry({
+          action: "CREATE",
+          entity: entityName,
+          entityId: id,
+          newValue: JSON.stringify(created),
+        });
+      }
       toast.success(`${title} added`);
     }
     setOpen(false);
@@ -55,6 +78,14 @@ export function CrudTable<T extends { id: string }>({ title, rows, setRows, colu
 
   const onDelete = (row: T) => {
     setRows(rows.filter((r) => r.id !== row.id));
+    if (entityName) {
+      addAuditEntry({
+        action: "DELETE",
+        entity: entityName,
+        entityId: row.id,
+        oldValue: JSON.stringify(row),
+      });
+    }
     toast.success(`${title} deleted`);
   };
 

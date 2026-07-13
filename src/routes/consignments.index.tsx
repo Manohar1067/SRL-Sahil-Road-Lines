@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,27 +12,11 @@ import {
 } from "@/components/ui/select";
 import type { Dispatch } from "@/lib/types";
 
-/** Returns the most relevant date for a dispatch based on its current status.
- *  "Shipped" has no dedicated date — returns null. */
-function statusDate(d: Dispatch): { label: string; value: string } | null {
-  switch (d.status) {
-    case "Created":
-      return { label: "Created", value: d.createdAt?.slice(0, 10) ?? d.date };
-    case "Dispatched":
-      return { label: "Dispatched", value: d.date };
-    case "Delivered":
-      return { label: "Delivered", value: d.deliveryDate || "—" };
-    case "Payment Pending":
-      return { label: "Pmt. Pending", value: d.deliveryDate || "—" };
-    case "Completed":
-      return { label: "Completed", value: d.deliveryDate || "—" };
-    default:
-      return null; // Shipped
-  }
-}
-
 export const Route = createFileRoute("/consignments/")({
   head: () => ({ meta: [{ title: "Consignments — Sahil Road Lines" }] }),
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+    q: search.q ? String(search.q) : undefined,
+  }),
   component: ConsignmentList,
 });
 
@@ -40,9 +24,8 @@ const ALL = "all";
 
 type SortKey = keyof Pick<
   Dispatch,
-  | "receiptNumber" | "date" | "documentationDate" | "invoiceDate"
-  | "truckNumber" | "driverName" | "consignor" | "consignee"
-  | "to" | "status" | "netFreight" | "advance" | "balance"
+  | "receiptNumber" | "date" | "truckNumber" | "driverName" | "consignor" | "consignee"
+  | "to" | "status" | "weight" | "ratePerTon" | "netFreight" | "advance" | "balance"
   | "finalPayable" | "createdAt"
 >;
 
@@ -56,63 +39,36 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 function ConsignmentList() {
   const [dispatches] = useDispatches();
   const navigate = useNavigate();
-  const [q, setQ] = useState("");
-  const [memo, setMemo] = useState("");
-  const [status, setStatus] = useState(ALL);
-  const [truck, setTruck] = useState(ALL);
-  const [driver, setDriver] = useState(ALL);
-  const [consignor, setConsignor] = useState(ALL);
-  const [consignee, setConsignee] = useState(ALL);
-  const [destination, setDestination] = useState(ALL);
-  const [material, setMaterial] = useState(ALL);
-  const [dispatchDate, setDispatchDate] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [docDate, setDocDate] = useState("");
-  const [invDate, setInvDate] = useState("");
-  const [minAmt, setMinAmt] = useState("");
-  const [maxAmt, setMaxAmt] = useState("");
+  const { q: urlQ } = useSearch({ from: "/consignments/" });
+  const [q, setQ] = useState(urlQ ?? "");
+  const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
+
+  // Sync search term from URL when navigating here via global search bar
+  useEffect(() => {
+    if (urlQ) { setQ(urlQ); setPage(1); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQ]);
+
+  const [memo, setMemo] = useState("");
+  const [status, setStatus] = useState(ALL);
+  const [dispatchDate, setDispatchDate] = useState("");
   const pageSize = 10;
-
-  const unique = (key: keyof typeof dispatches[number]) =>
-    Array.from(new Set(dispatches.map((d) => String(d[key] || "")).filter(Boolean))).sort();
-
-  const trucks = unique("truckNumber");
-  const drivers = unique("driverName");
-  const consignors = unique("consignor");
-  const consignees = unique("consignee");
-  const destinations = unique("to");
-  const materials = unique("article");
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const memoNeedle = memo.trim().toLowerCase();
-    const min = minAmt !== "" ? Number(minAmt) : null;
-    const max = maxAmt !== "" ? Number(maxAmt) : null;
 
     let rows = dispatches.filter((d) => {
       if (memoNeedle && !d.receiptNumber.toLowerCase().includes(memoNeedle)) return false;
       if (status !== ALL && d.status !== status) return false;
-      if (truck !== ALL && d.truckNumber !== truck) return false;
-      if (driver !== ALL && d.driverName !== driver) return false;
-      if (consignor !== ALL && d.consignor !== consignor) return false;
-      if (consignee !== ALL && d.consignee !== consignee) return false;
-      if (destination !== ALL && d.to !== destination) return false;
-      if (material !== ALL && d.article !== material) return false;
       if (dispatchDate && d.date !== dispatchDate) return false;
-      if (deliveryDate && d.deliveryDate !== deliveryDate) return false;
-      if (docDate && d.documentationDate !== docDate) return false;
-      if (invDate && d.invoiceDate !== invDate) return false;
-      if (min !== null && d.netFreight < min) return false;
-      if (max !== null && d.netFreight > max) return false;
       if (!needle) return true;
       return [
         d.receiptNumber, d.truckNumber, d.driverName, d.consignor, d.consignee,
         d.to, d.from, d.article, d.status, d.deliveryDate, d.date,
-        d.documentationDate, d.invoiceDate, d.lorryOwnerName, d.paidAt, d.remarks,
-        d.gcNumber,
+        d.documentationDate, d.lorryOwnerName, d.paidAt, d.remarks,
       ].some((v) => (v ?? "").toString().toLowerCase().includes(needle));
     });
 
@@ -126,8 +82,7 @@ function ConsignmentList() {
     });
 
     return rows;
-  }, [dispatches, q, memo, status, truck, driver, consignor, consignee, destination, material,
-    dispatchDate, deliveryDate, docDate, invDate, minAmt, maxAmt, sortKey, sortDir]);
+  }, [dispatches, q, memo, status, dispatchDate, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -140,32 +95,16 @@ function ConsignmentList() {
 
   const resetFilters = () => {
     setQ(""); setMemo("");
-    setStatus(ALL); setTruck(ALL); setDriver(ALL); setConsignor(ALL); setConsignee(ALL);
-    setDestination(ALL); setMaterial(ALL);
-    setDispatchDate(""); setDeliveryDate(""); setDocDate(""); setInvDate("");
-    setMinAmt(""); setMaxAmt("");
+    setStatus(ALL);
+    setDispatchDate("");
     setPage(1);
   };
 
   const activeFilters =
+    (q ? 1 : 0) +
     (memo ? 1 : 0) +
-    (status !== ALL ? 1 : 0) + (truck !== ALL ? 1 : 0) + (driver !== ALL ? 1 : 0) +
-    (consignor !== ALL ? 1 : 0) + (consignee !== ALL ? 1 : 0) +
-    (destination !== ALL ? 1 : 0) + (material !== ALL ? 1 : 0) +
-    (dispatchDate ? 1 : 0) + (deliveryDate ? 1 : 0) + (docDate ? 1 : 0) + (invDate ? 1 : 0) +
-    (minAmt ? 1 : 0) + (maxAmt ? 1 : 0);
-
-  const SelectFilter = ({
-    value, onChange, label, options,
-  }: { value: string; onChange: (v: string) => void; label: string; options: string[] }) => (
-    <Select value={value} onValueChange={(v) => { onChange(v); setPage(1); }}>
-      <SelectTrigger className="h-9"><SelectValue placeholder={label} /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL}>All {label}</SelectItem>
-        {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
+    (status !== ALL ? 1 : 0) +
+    (dispatchDate ? 1 : 0);
 
   const Th = ({ label, sk }: { label: string; sk: SortKey }) => (
     <th
@@ -180,7 +119,7 @@ function ConsignmentList() {
     <AppShell title="Consignment List" breadcrumb={["Home", "Consignments"]}>
       <Card className="border-0 shadow-sm">
         <CardContent className="space-y-4 p-5">
-          {/* Search Row */}
+          {/* Row 1: Search + New Dispatch button */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -191,56 +130,46 @@ function ConsignmentList() {
                 className="pl-9"
               />
             </div>
-            <Input
-              value={memo}
-              onChange={(e) => { setMemo(e.target.value); setPage(1); }}
-              placeholder="Memo # (e.g. SRL-2026-000001)"
-              className="sm:max-w-[240px] font-mono"
-            />
             <Button onClick={() => navigate({ to: "/dispatch/new" })}>
               <FilePlus2 className="mr-1.5 h-4 w-4" /> New Dispatch
             </Button>
           </div>
 
-          {/* Dropdown Filters */}
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7">
-            <SelectFilter value={status} onChange={setStatus} label="Statuses" options={STATUS_OPTIONS as unknown as string[]} />
-            <SelectFilter value={truck} onChange={setTruck} label="Trucks" options={trucks} />
-            <SelectFilter value={driver} onChange={setDriver} label="Drivers" options={drivers} />
-            <SelectFilter value={consignor} onChange={setConsignor} label="Consignors" options={consignors} />
-            <SelectFilter value={consignee} onChange={setConsignee} label="Consignees" options={consignees} />
-            <SelectFilter value={destination} onChange={setDestination} label="Destinations" options={destinations} />
-            <SelectFilter value={material} onChange={setMaterial} label="Materials" options={materials} />
-          </div>
+          {/* Row 2: Memo # + Status + Date filters */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Memo Number filter */}
+            <Input
+              value={memo}
+              onChange={(e) => { setMemo(e.target.value); setPage(1); }}
+              placeholder="Memo # (e.g. SRL-2026-000001)"
+              className="font-mono"
+            />
 
-          {/* Date Filters + Amount Range */}
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+            {/* Status filter */}
+            <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All Statuses</SelectItem>
+                {(STATUS_OPTIONS as string[]).map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Dispatch Date filter */}
             <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Dispatch Date</label>
-              <Input type="date" value={dispatchDate} onChange={(e) => { setDispatchDate(e.target.value); setPage(1); }} />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Documentation Date</label>
-              <Input type="date" value={docDate} onChange={(e) => { setDocDate(e.target.value); setPage(1); }} />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Final Payment Date</label>
-              <Input type="date" value={invDate} onChange={(e) => { setInvDate(e.target.value); setPage(1); }} />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Delivery Date</label>
-              <Input type="date" value={deliveryDate} onChange={(e) => { setDeliveryDate(e.target.value); setPage(1); }} />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Min Freight (₹)</label>
-              <Input type="number" min={0} value={minAmt} onChange={(e) => { setMinAmt(e.target.value); setPage(1); }} placeholder="0" />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium uppercase text-muted-foreground">Max Freight (₹)</label>
-              <Input type="number" min={0} value={maxAmt} onChange={(e) => { setMaxAmt(e.target.value); setPage(1); }} placeholder="Any" />
+              <Input
+                type="date"
+                value={dispatchDate}
+                onChange={(e) => { setDispatchDate(e.target.value); setPage(1); }}
+                title="Filter by Dispatch Date"
+              />
             </div>
           </div>
 
+          {/* Active filter count + clear */}
           {activeFilters > 0 && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{activeFilters} filter{activeFilters > 1 ? "s" : ""} active — {filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
@@ -255,19 +184,19 @@ function ConsignmentList() {
               <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <Th label="Memo #" sk="receiptNumber" />
-
                   <Th label="Truck" sk="truckNumber" />
                   <Th label="Driver" sk="driverName" />
                   <Th label="Consignor" sk="consignor" />
                   <Th label="Consignee" sk="consignee" />
+                  <th className="px-4 py-3">From</th>
                   <Th label="Destination" sk="to" />
                   <th className="px-4 py-3">Material</th>
-                  <th className="px-4 py-3 text-right">Weight</th>
+                  <Th label="Weight" sk="weight" />
+                  <Th label="Rate/Ton" sk="ratePerTon" />
                   <Th label="Total" sk="netFreight" />
                   <Th label="Advance" sk="advance" />
                   <Th label="Balance" sk="balance" />
                   <Th label="Status" sk="status" />
-                  <th className="px-4 py-3">Updated Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y bg-card">
@@ -287,25 +216,15 @@ function ConsignmentList() {
                     <td className="px-4 py-3">{d.driverName}</td>
                     <td className="px-4 py-3 max-w-[140px] truncate" title={d.consignor}>{d.consignor}</td>
                     <td className="px-4 py-3 max-w-[140px] truncate" title={d.consignee}>{d.consignee}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{d.from}</td>
                     <td className="px-4 py-3">{d.to}</td>
                     <td className="px-4 py-3">{d.article}</td>
                     <td className="px-4 py-3 text-right">{d.weight} T</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{formatINR(d.ratePerTon)}</td>
                     <td className="px-4 py-3 text-right font-medium">{formatINR(d.netFreight)}</td>
                     <td className="px-4 py-3 text-right">{formatINR(d.advance)}</td>
                     <td className="px-4 py-3 text-right">{formatINR(d.balance)}</td>
                     <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {(() => {
-                        const sd = statusDate(d);
-                        if (!sd) return <span className="text-xs text-muted-foreground">—</span>;
-                        return (
-                          <span className="text-xs">
-                            <span className="block font-medium text-foreground">{sd.value}</span>
-                            <span className="text-muted-foreground">{sd.label}</span>
-                          </span>
-                        );
-                      })()}
-                    </td>
                   </tr>
                 ))}
                 {pageRows.length === 0 && (
