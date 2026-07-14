@@ -14,6 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { notifyDispatchCreated } from "@/lib/notifications";
 
 export const Route = createFileRoute("/trash")({
   head: () => ({ meta: [{ title: "Trash — Sahil Road Lines" }] }),
@@ -45,6 +46,7 @@ function TrashPage() {
       oldValue: JSON.stringify(d),
       newValue: JSON.stringify(restored),
     });
+    notifyDispatchCreated(restored);
     toast.success(`${d.receiptNumber} restored`);
   };
 

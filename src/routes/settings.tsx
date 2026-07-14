@@ -6,9 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useSettings, hashPin, exportAllData, importAllData, addAuditEntry } from "@/lib/store";
+import { useSettings, hashPin, addAuditEntry } from "@/lib/store";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
+import { exportToExcel, importFile } from "@/lib/export-import";
+import { notifyExportCompleted, notifyImportCompleted, notifyBackupCreated } from "@/lib/notifications";
+import { savePersistentSettings } from "@/lib/settings-persistence";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings — Sahil Road Lines" }] }),
@@ -25,9 +28,29 @@ function SettingsPage() {
   const [draft, setDraft] = useState(c);
   const setDraftField = (patch: Partial<typeof c>) => setDraft((d) => ({ ...d, ...patch }));
 
-  const saveCompany = () => {
+  // Paid By options management
+  const [newPaidByOption, setNewPaidByOption] = useState("");
+  const paidByOptions = settings.paidByOptions ?? ["Kurmannapalem", "Karnataka"];
+
+  const addPaidByOption = () => {
+    if (!newPaidByOption.trim()) return;
+    const updated = [...paidByOptions, newPaidByOption.trim()];
+    setSettings({ ...settings, paidByOptions: updated });
+    setNewPaidByOption("");
+    toast.success("Location added");
+  };
+
+  const removePaidByOption = (option: string) => {
+    const updated = paidByOptions.filter((o) => o !== option);
+    setSettings({ ...settings, paidByOptions: updated });
+    toast.success("Location removed");
+  };
+
+  const saveCompany = async () => {
     const old = settings.company;
-    setSettings({ ...settings, company: draft });
+    const updated = { ...settings, company: draft };
+    const persisted = await savePersistentSettings(updated);
+    setSettings(persisted);
     addAuditEntry({
       action: "UPDATE",
       entity: "settings",
@@ -66,7 +89,9 @@ function SettingsPage() {
     if (pin.length < 4) return toast.error("PIN must be at least 4 digits");
     if (pin !== pin2) return toast.error("PINs do not match");
     const h = await hashPin(pin);
-    setSettings({ ...settings, adminPinHash: h, autoLockMinutes: Math.max(1, Number(autoLock) || 15) });
+    const updated = { ...settings, adminPinHash: h, autoLockMinutes: Math.max(1, Number(autoLock) || 15) };
+    const persisted = await savePersistentSettings(updated);
+    setSettings(persisted);
     addAuditEntry({
       action: "UPDATE",
       entity: "settings",
@@ -77,10 +102,12 @@ function SettingsPage() {
     toast.success("Admin PIN updated");
   };
 
-  const onSaveAutoLock = () => {
+  const onSaveAutoLock = async () => {
     const mins = Math.max(1, Number(autoLock) || 15);
     const old = settings.autoLockMinutes;
-    setSettings({ ...settings, autoLockMinutes: mins });
+    const updated = { ...settings, autoLockMinutes: mins };
+    const persisted = await savePersistentSettings(updated);
+    setSettings(persisted);
     addAuditEntry({
       action: "UPDATE",
       entity: "settings",
@@ -93,23 +120,23 @@ function SettingsPage() {
 
   const onExport = () => {
     try {
-      const json = exportAllData();
-      const blob = new Blob([json], { type: "application/json" });
+      const blob = exportToExcel();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `sahil-roadlines-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `sahil-roadlines-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
       addAuditEntry({
         action: "CREATE",
         entity: "settings",
         entityId: "backup",
-        newValue: JSON.stringify({ action: "Backup exported", date: new Date().toISOString() }),
+        newValue: JSON.stringify({ action: "Excel export completed", date: new Date().toISOString() }),
       });
-      toast.success("Backup exported");
+      notifyExportCompleted();
+      toast.success("Excel export completed");
     } catch {
-      toast.error("Could not export backup");
+      toast.error("Could not export data");
     }
   };
 
@@ -117,18 +144,22 @@ function SettingsPage() {
     if (!f) return;
     if (!confirm("This will OVERWRITE all existing data (dispatches, parties, trucks, drivers, settings). Continue?")) return;
     try {
-      const text = await f.text();
-      importAllData(text);
-      addAuditEntry({
-        action: "RESTORE",
-        entity: "settings",
-        entityId: "backup",
-        newValue: JSON.stringify({ action: "Backup restored", file: f.name, date: new Date().toISOString() }),
-      });
-      toast.success("Backup restored. Reloading…");
-      setTimeout(() => location.reload(), 700);
+      const result = await importFile(f);
+      if (result.success) {
+        addAuditEntry({
+          action: "RESTORE",
+          entity: "settings",
+          entityId: "backup",
+          newValue: JSON.stringify({ action: "Data imported", file: f.name, date: new Date().toISOString() }),
+        });
+        notifyImportCompleted(f.name);
+        toast.success(result.message + ". Reloading…");
+        setTimeout(() => location.reload(), 700);
+      } else {
+        toast.error(result.message);
+      }
     } catch (e: any) {
-      toast.error(e?.message || "Invalid backup file");
+      toast.error(e?.message || "Invalid file");
     }
   };
 
@@ -213,6 +244,38 @@ function SettingsPage() {
         </Card>
 
         <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-base">Paid By Locations</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={newPaidByOption}
+                onChange={(e) => setNewPaidByOption(e.target.value)}
+                placeholder="Add new location (e.g., Hyderabad)"
+                className="flex-1"
+              />
+              <Button onClick={addPaidByOption} disabled={!newPaidByOption.trim()}>Add</Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {paidByOptions.map((option) => (
+                <div key={option} className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-sm">
+                  <span>{option}</span>
+                  <button
+                    type="button"
+                    onClick={() => removePaidByOption(option)}
+                    className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              These locations appear in the "Paid By" dropdown when creating dispatches.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
           <CardHeader><CardTitle className="text-base">Appearance</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-between">
             <div>
@@ -236,16 +299,31 @@ function SettingsPage() {
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-base">Backup &amp; Restore</CardTitle></CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label className="text-sm font-medium">All application data</Label>
-              <p className="text-xs text-muted-foreground">Dispatches, drivers, trucks, consignors, consignees, company settings, application settings.</p>
+          <CardHeader><CardTitle className="text-base">Export &amp; Import</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <Label className="text-sm font-medium">Export Data</Label>
+                <p className="text-xs text-muted-foreground">Export all data to Microsoft Excel (.xlsx) format.</p>
+              </div>
+              <Button onClick={onExport}>Export to Excel</Button>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={onExport}>Export Backup</Button>
-              <input ref={importRef} type="file" accept="application/json" className="hidden" onChange={(e) => onImport(e.target.files?.[0] || null)} />
-              <Button variant="outline" onClick={() => importRef.current?.click()}>Import Backup</Button>
+
+            <div className="border-t pt-4">
+              <Label className="text-sm font-medium mb-3 block">Import Data</Label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <input ref={importRef} type="file" accept=".xlsx,.xls,.csv,.json" className="hidden" onChange={(e) => onImport(e.target.files?.[0] || null)} />
+                  <Button variant="outline" onClick={() => importRef.current?.click()}>
+                    Import from Local Device
+                  </Button>
+                  <span className="text-xs text-muted-foreground">Supported: Excel (.xlsx), CSV, JSON</span>
+                </div>
+                <Button variant="outline" disabled className="w-fit opacity-50">
+                  Import from Google Drive
+                  <span className="ml-2 text-[10px] bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

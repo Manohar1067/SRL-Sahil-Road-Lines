@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useDispatches } from "@/lib/store";
 import { StatusBadge, STATUS_OPTIONS, formatINR } from "@/components/StatusBadge";
-import { Search, FilePlus2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, X } from "lucide-react";
+import { Search, FilePlus2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, X, Printer } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -14,13 +14,52 @@ import type { Dispatch } from "@/lib/types";
 
 export const Route = createFileRoute("/consignments/")({
   head: () => ({ meta: [{ title: "Consignments — Sahil Road Lines" }] }),
-  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { q?: string; status?: string; date?: string } => ({
     q: search.q ? String(search.q) : undefined,
+    status: search.status ? String(search.status) : undefined,
+    date: search.date ? String(search.date) : undefined,
   }),
   component: ConsignmentList,
 });
 
 const ALL = "all";
+
+const DATE_FILTER_OPTIONS = [
+  { value: "", label: "All Dates" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "custom", label: "Custom Range" },
+];
+
+function getDateRange(filter: string): { start?: string; end?: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  if (filter === "today") {
+    return { start: today.toISOString().slice(0, 10), end: today.toISOString().slice(0, 10) };
+  }
+  
+  if (filter === "yesterday") {
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return { start: yesterday.toISOString().slice(0, 10), end: yesterday.toISOString().slice(0, 10) };
+  }
+  
+  if (filter === "week") {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    return { start: weekStart.toISOString().slice(0, 10), end: today.toISOString().slice(0, 10) };
+  }
+  
+  if (filter === "month") {
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { start: monthStart.toISOString().slice(0, 10), end: today.toISOString().slice(0, 10) };
+  }
+  
+  return {};
+}
 
 type SortKey = keyof Pick<
   Dispatch,
@@ -39,31 +78,44 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 function ConsignmentList() {
   const [dispatches] = useDispatches();
   const navigate = useNavigate();
-  const { q: urlQ } = useSearch({ from: "/consignments/" });
+  const { q: urlQ, status: urlStatus, date: urlDate } = useSearch({ from: "/consignments/" });
   const [q, setQ] = useState(urlQ ?? "");
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  // Sync search term from URL when navigating here via global search bar
+  // Sync search term, status and date from URL when navigating here
   useEffect(() => {
     if (urlQ) { setQ(urlQ); setPage(1); }
+    if (urlStatus) { setStatus(urlStatus); setPage(1); }
+    if (urlDate) { setDateFilter("custom"); setCustomDateStart(urlDate); setPage(1); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlQ]);
+  }, [urlQ, urlStatus, urlDate]);
 
   const [memo, setMemo] = useState("");
-  const [status, setStatus] = useState(ALL);
-  const [dispatchDate, setDispatchDate] = useState("");
+  const [status, setStatus] = useState(urlStatus ?? ALL);
+  const [dateFilter, setDateFilter] = useState("");
+  const [customDateStart, setCustomDateStart] = useState("");
+  const [customDateEnd, setCustomDateEnd] = useState("");
   const pageSize = 10;
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const memoNeedle = memo.trim().toLowerCase();
+    const dateRange = getDateRange(dateFilter);
 
     let rows = dispatches.filter((d) => {
       if (memoNeedle && !d.receiptNumber.toLowerCase().includes(memoNeedle)) return false;
       if (status !== ALL && d.status !== status) return false;
-      if (dispatchDate && d.date !== dispatchDate) return false;
+      
+      // Date filtering
+      if (dateFilter === "custom" && (customDateStart || customDateEnd)) {
+        if (customDateStart && d.date < customDateStart) return false;
+        if (customDateEnd && d.date > customDateEnd) return false;
+      } else if (dateRange.start && dateRange.end) {
+        if (d.date < dateRange.start || d.date > dateRange.end) return false;
+      }
+      
       if (!needle) return true;
       return [
         d.receiptNumber, d.truckNumber, d.driverName, d.consignor, d.consignee,
@@ -82,7 +134,7 @@ function ConsignmentList() {
     });
 
     return rows;
-  }, [dispatches, q, memo, status, dispatchDate, sortKey, sortDir]);
+  }, [dispatches, q, memo, status, dateFilter, customDateStart, customDateEnd, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -96,7 +148,9 @@ function ConsignmentList() {
   const resetFilters = () => {
     setQ(""); setMemo("");
     setStatus(ALL);
-    setDispatchDate("");
+    setDateFilter("");
+    setCustomDateStart("");
+    setCustomDateEnd("");
     setPage(1);
   };
 
@@ -104,7 +158,7 @@ function ConsignmentList() {
     (q ? 1 : 0) +
     (memo ? 1 : 0) +
     (status !== ALL ? 1 : 0) +
-    (dispatchDate ? 1 : 0);
+    (dateFilter ? 1 : 0);
 
   const Th = ({ label, sk }: { label: string; sk: SortKey }) => (
     <th
@@ -158,15 +212,37 @@ function ConsignmentList() {
               </SelectContent>
             </Select>
 
-            {/* Dispatch Date filter */}
-            <div>
-              <Input
-                type="date"
-                value={dispatchDate}
-                onChange={(e) => { setDispatchDate(e.target.value); setPage(1); }}
-                title="Filter by Dispatch Date"
-              />
-            </div>
+            {/* Date filter */}
+            <Select value={dateFilter} onValueChange={(v) => { setDateFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="All Dates" />
+              </SelectTrigger>
+              <SelectContent>
+                {DATE_FILTER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Custom date range inputs */}
+            {dateFilter === "custom" && (
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={customDateStart}
+                  onChange={(e) => { setCustomDateStart(e.target.value); setPage(1); }}
+                  placeholder="Start Date"
+                  className="flex-1"
+                />
+                <Input
+                  type="date"
+                  value={customDateEnd}
+                  onChange={(e) => { setCustomDateEnd(e.target.value); setPage(1); }}
+                  placeholder="End Date"
+                  className="flex-1"
+                />
+              </div>
+            )}
           </div>
 
           {/* Active filter count + clear */}

@@ -305,11 +305,17 @@ export interface CompanyInfo {
   logo: string;
 }
 
+export const DEFAULT_PAID_BY_OPTIONS = ["Kurmannapalem", "Karnataka"];
+
 export interface AppSettings {
   darkMode: boolean;
   company: CompanyInfo;
   adminPinHash?: string;
   autoLockMinutes?: number;
+  paidByOptions?: string[];
+  /** Reserved for future Supabase sync */
+  remoteId?: string;
+  lastSyncedAt?: string;
 }
 
 export const useSettings = () =>

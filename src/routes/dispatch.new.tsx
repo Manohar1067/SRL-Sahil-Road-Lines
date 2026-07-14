@@ -12,6 +12,7 @@ import {
   addAuditEntry,
 } from "@/lib/store";
 import type { Dispatch } from "@/lib/types";
+import { notifyDispatchCreated } from "@/lib/notifications";
 
 export const Route = createFileRoute("/dispatch/new")({
   head: () => ({ meta: [{ title: "New Dispatch — Sahil Road Lines" }] }),
@@ -36,6 +37,7 @@ function NewDispatch() {
       receiptNumber: dispatch.receiptNumber,
       newValue: JSON.stringify(dispatch),
     });
+    notifyDispatchCreated(dispatch);
     toast.success(`Dispatch ${dispatch.receiptNumber} saved`);
     navigate({ to: "/consignments" });
   };

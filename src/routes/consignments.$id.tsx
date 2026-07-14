@@ -21,6 +21,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { notifyDispatchEdited, notifyDispatchDeleted, notifyStatusChange } from "@/lib/notifications";
 
 export const Route = createFileRoute("/consignments/$id")({
   head: () => ({ meta: [{ title: "Dispatch Details — Sahil Road Lines" }] }),
@@ -168,6 +169,11 @@ function DispatchDetails() {
       oldValue: JSON.stringify(old),
       newValue: JSON.stringify(updated),
     });
+    if (updated.status !== old.status) {
+      notifyStatusChange(updated, updated.status);
+    } else {
+      notifyDispatchEdited(updated);
+    }
     setEditing(false);
     toast.success("Dispatch updated");
   };
@@ -182,6 +188,7 @@ function DispatchDetails() {
       receiptNumber: found.receiptNumber,
       oldValue: JSON.stringify(found),
     });
+    notifyDispatchDeleted(found);
     toast.success("Dispatch moved to Trash");
     navigate({ to: "/consignments" });
   };

@@ -11,6 +11,7 @@ import type { AuditEntry } from "@/lib/types";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { buildFieldChanges } from "@/lib/audit-diff";
 
 export const Route = createFileRoute("/audit-log")({
   head: () => ({ meta: [{ title: "Audit Log — Sahil Road Lines" }] }),
@@ -43,35 +44,6 @@ const MODULE_LABELS: Record<AuditEntry["entity"], string> = {
 };
 
 const ALL = "all";
-
-/** Parse JSON safely and return a formatted diff string */
-function buildDiff(oldValue: string | undefined, newValue: string | undefined): { prev: string; next: string } {
-  if (!oldValue && !newValue) return { prev: "—", next: "—" };
-
-  try {
-    const n = newValue ? JSON.parse(newValue) : null;
-    const o = oldValue ? JSON.parse(oldValue) : null;
-
-    if (!n && o) return { prev: JSON.stringify(o, null, 2), next: "— (deleted)" };
-    if (n && !o) return { prev: "— (new record)", next: JSON.stringify(n, null, 2) };
-
-    // Compute field-level changes
-    const changes: string[] = [];
-    const allKeys = new Set([...Object.keys(n || {}), ...Object.keys(o || {})]);
-    allKeys.forEach((k) => {
-      const ov = JSON.stringify((o as any)?.[k]);
-      const nv = JSON.stringify((n as any)?.[k]);
-      if (ov !== nv) {
-        changes.push(`${k}: ${ov ?? "—"} → ${nv ?? "—"}`);
-      }
-    });
-
-    if (changes.length === 0) return { prev: "—", next: "No changes" };
-    return { prev: changes.map((c) => `− ${c.split(" → ")[0]}`).join("\n"), next: changes.map((c) => `+ ${c.split(" → ")[1]}`).join("\n") };
-  } catch {
-    return { prev: oldValue ?? "—", next: newValue ?? "—" };
-  }
-}
 
 function AuditLogPage() {
   const [log] = useAuditLog();
@@ -153,8 +125,7 @@ function AuditLogPage() {
                   <th className="px-4 py-3">Module</th>
                   <th className="px-4 py-3">Action</th>
                   <th className="px-4 py-3">Receipt #</th>
-                  <th className="px-4 py-3 w-64">Previous Value</th>
-                  <th className="px-4 py-3 w-64">New Value</th>
+                  <th className="px-4 py-3">Changes</th>
                 </tr>
               </thead>
               <tbody className="divide-y bg-card">
@@ -162,7 +133,7 @@ function AuditLogPage() {
                   const dt = new Date(entry.changedAt);
                   const date = dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
                   const time = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
-                  const { prev, next } = buildDiff(entry.oldValue, entry.newValue);
+                  const changes = buildFieldChanges(entry.oldValue, entry.newValue);
 
                   return (
                     <tr key={entry.id} className="hover:bg-muted/40">
@@ -184,37 +155,28 @@ function AuditLogPage() {
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-primary">{entry.receiptNumber || "—"}</td>
 
-                      {/* Previous Value */}
-                      <td className="px-4 py-3 max-w-[256px]">
-                        {entry.oldValue ? (
-                          <details className="cursor-pointer">
-                            <summary className="text-xs text-muted-foreground hover:text-foreground select-none">
-                              View previous
-                            </summary>
-                            <pre className="mt-1 max-h-36 overflow-auto rounded bg-muted p-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
-                              {prev}
-                            </pre>
-                          </details>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">—</span>
-                        )}
-                      </td>
-
-                      {/* New Value */}
-                      <td className="px-4 py-3 max-w-[256px]">
-                        {entry.newValue ? (
+                      {/* Business-friendly changes */}
+                      <td className="px-4 py-3 max-w-md">
+                        {changes.length > 0 ? (
                           <details className="cursor-pointer">
                             <summary className="text-xs text-primary hover:underline select-none">
-                              View changes
+                              {changes.length} change{changes.length > 1 ? "s" : ""}
                             </summary>
-                            <pre className="mt-1 max-h-36 overflow-auto rounded bg-muted p-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
-                              {next}
-                            </pre>
+                            <div className="mt-2 space-y-1.5 max-h-48 overflow-auto rounded bg-muted p-2">
+                              {changes.map((change, idx) => (
+                                <div key={idx} className="text-[11px]">
+                                  <div className="font-medium text-muted-foreground mb-0.5">{change.label}</div>
+                                  <div className="flex gap-2">
+                                    <span className="text-destructive line-through">{change.oldValue}</span>
+                                    <span className="text-success">→</span>
+                                    <span className="text-success font-medium">{change.newValue}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </details>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">
-                            {entry.oldValue ? "Record deleted" : "—"}
-                          </span>
+                          <span className="text-xs text-muted-foreground italic">No changes</span>
                         )}
                       </td>
                     </tr>
@@ -222,7 +184,7 @@ function AuditLogPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-16 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-16 text-center text-muted-foreground">
                       {log.length === 0
                         ? "No audit entries yet. Create, edit or delete a record to see entries here."
                         : "No entries match your filters."}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { nextReceiptNumber, uid } from "@/lib/store";
+import { nextReceiptNumber, uid, DEFAULT_PAID_BY_OPTIONS } from "@/lib/store";
 import type { AppSettings } from "@/lib/store";
 import type { Dispatch, Driver, Status, Truck } from "@/lib/types";
 import { formatINR, STATUS_OPTIONS } from "@/components/StatusBadge";
@@ -165,7 +165,7 @@ export interface DispatchFormProps {
   onCancel: () => void;
 }
 
-const PAID_BY_OPTIONS = ["Sahil", "Kamesh"];
+const PAID_BY_OPTIONS = DEFAULT_PAID_BY_OPTIONS;
 
 // Which fields the user has manually overridden (won't be auto-recalculated)
 type ManualFields = Set<"netFreight" | "totalExpenses" | "finalPayable">;
@@ -178,6 +178,7 @@ export function DispatchForm({
   drivers,
   consignors,
   consignees,
+  settings,
   onSave,
   onCancel,
 }: DispatchFormProps) {
@@ -294,6 +295,7 @@ export function DispatchForm({
   const driverOptions = drivers.map((d) => d.name);
   const consignorOptions = (consignors ?? []).map((c) => c.companyName);
   const consigneeOptions = (consignees ?? []).map((c) => c.companyName);
+  const paidByOptions = settings.paidByOptions ?? DEFAULT_PAID_BY_OPTIONS;
 
   const F = ({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) => (
     <div className="space-y-1.5">
@@ -305,7 +307,7 @@ export function DispatchForm({
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5 pb-24">
 
       {/* ── Card 1: Dispatch Information ── */}
       <Card className="border-0 shadow-sm">
@@ -542,8 +544,8 @@ export function DispatchForm({
             <Combobox
               value={form.paidAt}
               onChange={(v) => update("paidAt", v)}
-              options={PAID_BY_OPTIONS}
-              placeholder="Sahil / Kamesh / custom"
+              options={paidByOptions}
+              placeholder="Select or type location"
               allowCustom
             />
           </F>
@@ -610,12 +612,14 @@ export function DispatchForm({
         </CardContent>
       </Card>
 
-      {/* ── Action Buttons ── */}
-      <div className="flex items-center justify-end gap-3 pb-8">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleSave} className="bg-[#c0272d] hover:bg-[#a01f23] text-white px-8">
-          {mode === "edit" ? "Save Changes" : "Save Dispatch"}
-        </Button>
+      {/* ── Sticky Action Buttons ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card/95 backdrop-blur p-4 shadow-lg">
+        <div className="mx-auto max-w-4xl flex items-center justify-end gap-3">
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button onClick={handleSave} className="bg-[#c0272d] hover:bg-[#a01f23] text-white px-8">
+            {mode === "edit" ? "Save Changes" : "Save Dispatch"}
+          </Button>
+        </div>
       </div>
     </div>
   );

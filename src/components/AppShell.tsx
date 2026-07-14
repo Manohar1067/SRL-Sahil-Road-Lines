@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, FilePlus2, ClipboardList, Truck, Building2,
-  BookUser, BarChart3, Settings, Bell, Search, Moon, Sun, Menu, History, Trash2,
+  BookUser, BarChart3, Settings, Moon, Sun, Menu, History, Trash2,
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSettings, useDispatches } from "@/lib/store";
@@ -10,8 +10,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { NotificationPanel } from "@/components/NotificationPanel";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,24 +29,8 @@ const nav = [
 export function AppShell({ children, title, breadcrumb }: { children: ReactNode; title: string; breadcrumb?: string[] }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [settings, setSettings] = useSettings();
-  const [dispatches] = useDispatches();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQ, setSearchQ] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-
-  const submitSearch = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const q = searchQ.trim();
-    if (!q) return;
-    navigate({ to: "/consignments", search: { q } } as any);
-    setSearchQ("");
-    searchRef.current?.blur();
-  };
-
-  const alertCount =
-    dispatches.filter((d) => d.balance > 0).length +
-    dispatches.filter((d) => d.status === "Dispatched" || d.status === "Shipped").length;
 
   useEffect(() => {
     if (settings.darkMode) document.documentElement.classList.add("dark");
@@ -128,22 +112,6 @@ export function AppShell({ children, title, breadcrumb }: { children: ReactNode;
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen((v) => !v)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <form onSubmit={submitSearch} className="relative hidden flex-1 max-w-md md:block">
-            <button
-              type="submit"
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Search"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-            <Input
-              ref={searchRef}
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder="Search dispatches… (Enter to go)"
-              className="pl-9 pr-3"
-            />
-          </form>
           <div className="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"
@@ -153,14 +121,7 @@ export function AppShell({ children, title, breadcrumb }: { children: ReactNode;
             >
               {settings.darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications" onClick={() => navigate({ to: "/dashboard" })}>
-              <Bell className="h-5 w-5" />
-              {alertCount > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white">
-                  {alertCount > 9 ? "9+" : alertCount}
-                </span>
-              )}
-            </Button>
+            <NotificationPanel />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-full p-1 pr-3 hover:bg-muted">

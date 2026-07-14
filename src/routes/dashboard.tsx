@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
+import { syncDispatchAlerts } from "@/lib/notifications";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Sahil Road Lines TMS" }] }),
@@ -19,16 +20,26 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Kpi({
-  label, value, icon: Icon, accent, badge, sub, to,
+  label, value, icon: Icon, accent, badge, sub, to, onClick,
 }: {
   label: string; value: string; icon: any; accent: string;
-  badge?: number; sub?: string; to?: string;
+  badge?: number; sub?: string; to?: string; onClick?: () => void;
 }) {
   const inner = (
-    <Card className={cn(
-      "overflow-hidden border-0 shadow-sm transition-all",
-      to ? "cursor-pointer hover:shadow-md hover:ring-2 hover:ring-primary/20" : "hover:shadow-md"
-    )}>
+    <Card 
+      className={cn(
+        "overflow-hidden border-0 shadow-sm transition-all duration-200",
+        (to || onClick) ? "cursor-pointer hover:shadow-lg hover:scale-[1.02] hover:ring-2 hover:ring-primary/20 focus:ring-2 focus:ring-primary/20 focus:outline-none" : "hover:shadow-md"
+      )} 
+      onClick={onClick}
+      tabIndex={to || onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && (to || onClick)) {
+          e.preventDefault();
+          if (onClick) onClick();
+        }
+      }}
+    >
       <CardContent className="flex items-center gap-4 p-5">
         <div className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-xl ${accent}`}>
           <Icon className="h-6 w-6" />
@@ -46,7 +57,7 @@ function Kpi({
       </CardContent>
     </Card>
   );
-  if (to) return <Link to={to as any}>{inner}</Link>;
+  if (to && !onClick) return <Link to={to as any}>{inner}</Link>;
   return inner;
 }
 
@@ -55,6 +66,11 @@ function Dashboard() {
   const [trucks] = useTrucks();
   const [drivers] = useDrivers();
   const navigate = useNavigate();
+
+  // Trigger notification alerts for pending payments and deliveries
+  useEffect(() => {
+    syncDispatchAlerts(dispatches);
+  }, [dispatches]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -104,32 +120,40 @@ function Dashboard() {
       {(stats.pendingPayment.length > 0 || stats.pendingDelivery.length > 0) && (
         <div className="mb-4 flex flex-wrap gap-2">
           {stats.pendingPayment.length > 0 && (
-            <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/consignments", search: { status: "Payment Pending" } })}
+              className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+            >
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span><strong>{stats.pendingPayment.length}</strong> dispatch{stats.pendingPayment.length > 1 ? "es" : ""} with pending payment — {formatINR(stats.pendingPaymentTotal)} outstanding</span>
-            </div>
+            </button>
           )}
           {stats.pendingDelivery.length > 0 && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/20 dark:text-amber-400">
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/consignments", search: { status: "Dispatched" } })}
+              className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:hover:bg-amber-950/30 transition-colors cursor-pointer"
+            >
               <Clock className="h-4 w-4 shrink-0" />
               <span><strong>{stats.pendingDelivery.length}</strong> trip{stats.pendingDelivery.length > 1 ? "s" : ""} running — awaiting delivery</span>
-            </div>
+            </button>
           )}
         </div>
       )}
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-        <Kpi label="Today's Dispatches" value={String(stats.todays.length)} icon={PackageSearch} accent="bg-primary/10 text-primary" to="/consignments" />
-        <Kpi label="Today's Revenue" value={formatINR(stats.todayRevenue)} icon={IndianRupee} accent="bg-success/15 text-success" to="/reports" />
-        <Kpi label="Today's Expenses" value={formatINR(stats.todayExpenses)} icon={TrendingDown} accent="bg-destructive/10 text-destructive" to="/reports" />
+        <Kpi label="Today's Dispatches" value={String(stats.todays.length)} icon={PackageSearch} accent="bg-primary/10 text-primary" onClick={() => navigate({ to: "/consignments", search: { date: today } })} />
+        <Kpi label="Today's Revenue" value={formatINR(stats.todayRevenue)} icon={IndianRupee} accent="bg-success/15 text-success" onClick={() => navigate({ to: "/reports", search: { type: "revenue", date: today } })} />
+        <Kpi label="Today's Expenses" value={formatINR(stats.todayExpenses)} icon={TrendingDown} accent="bg-destructive/10 text-destructive" onClick={() => navigate({ to: "/reports", search: { type: "expenses", date: today } })} />
         <Kpi
           label="Today's Profit"
           value={formatINR(stats.todayProfit)}
           icon={TrendingUp}
           accent={stats.todayProfit >= 0 ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive"}
           sub="Revenue − Expenses"
-          to="/reports"
+          onClick={() => navigate({ to: "/reports", search: { type: "profit", date: today } })}
         />
         <Kpi
           label="Running Trips"
@@ -137,16 +161,16 @@ function Dashboard() {
           icon={Truck}
           accent="bg-amber-100 text-amber-600 dark:bg-amber-950/30"
           badge={stats.running.length}
-          to="/consignments"
+          onClick={() => navigate({ to: "/consignments", search: { status: "Dispatched" } })}
         />
-        <Kpi label="Completed Trips" value={String(stats.completed.length)} icon={PackageCheck} accent="bg-success/15 text-success" to="/consignments" />
+        <Kpi label="Completed Trips" value={String(stats.completed.length)} icon={PackageCheck} accent="bg-success/15 text-success" onClick={() => navigate({ to: "/consignments", search: { status: "Completed" } })} />
         <Kpi
           label="Pending Deliveries"
           value={String(stats.pendingDelivery.length)}
           icon={Clock}
           accent="bg-warning/20 text-warning-foreground"
           badge={stats.pendingDelivery.length}
-          to="/consignments"
+          onClick={() => navigate({ to: "/consignments", search: { status: "Dispatched" } })}
         />
         <Kpi
           label="Pending Payments"
@@ -155,12 +179,12 @@ function Dashboard() {
           accent="bg-destructive/10 text-destructive"
           badge={stats.pendingPayment.length}
           sub={formatINR(stats.pendingPaymentTotal)}
-          to="/consignments"
+          onClick={() => navigate({ to: "/consignments", search: { status: "Payment Pending" } })}
         />
-        <Kpi label="Collection Due" value={formatINR(stats.collectionAmount)} icon={Wallet} accent="bg-purple-100 text-purple-600 dark:bg-purple-950/30" to="/consignments" />
-        <Kpi label="Monthly Revenue" value={formatINR(stats.monthRevenue)} icon={IndianRupee} accent="bg-primary/10 text-primary" to="/reports" />
+        <Kpi label="Collection Due" value={formatINR(stats.collectionAmount)} icon={Wallet} accent="bg-purple-100 text-purple-600 dark:bg-purple-950/30" onClick={() => navigate({ to: "/reports", search: { type: "collection" } })} />
+        <Kpi label="Monthly Revenue" value={formatINR(stats.monthRevenue)} icon={IndianRupee} accent="bg-primary/10 text-primary" onClick={() => navigate({ to: "/reports", search: { type: "revenue", period: "month" } })} />
         <Kpi label="Total Trucks" value={String(trucks.length)} icon={Truck} accent="bg-primary/10 text-primary" to="/trucks" />
-        <Kpi label="Total Drivers" value={String(drivers.length)} icon={Users} accent="bg-accent text-accent-foreground" to="/trucks" />
+        <Kpi label="Total Drivers" value={String(drivers.length)} icon={Users} accent="bg-accent text-accent-foreground" to="/drivers" />
       </div>
 
       {/* Top Performer Row */}

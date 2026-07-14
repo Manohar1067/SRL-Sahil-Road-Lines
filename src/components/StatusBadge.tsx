@@ -20,14 +20,15 @@ export function StatusBadge({ status }: { status: Status | string }) {
   );
 }
 
-/** Active statuses shown in dropdowns/filters — does NOT include legacy Created / Shipped */
+/** Active statuses shown in dropdowns/filters — includes all available statuses */
 export const STATUS_OPTIONS: Status[] = [
+  "Created",
   "Dispatched",
   "Delivered",
-  "Completed",
-  "Payment Pending",
   "LR Received",
   "LR Submitted",
+  "Payment Pending",
+  "Completed",
 ];
 
 export const formatINR = (n: number) =>
